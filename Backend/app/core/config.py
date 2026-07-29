@@ -28,8 +28,9 @@ class Settings(BaseSettings):
     # Storage Settings
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE_MB: int = 10
-    ML_SERVICE_URL: str = "http://127.0.0.1:8001"
-    ML_SERVICE_TIMEOUT_SECONDS: float = 10.0
+    MODEL_WEIGHTS_PATH: str = "best.pt"
+    CONFIDENCE_THRESHOLD: float = 0.25
+    IOU_THRESHOLD: float = 0.5
 
     @property
     def database_url(self) -> str:

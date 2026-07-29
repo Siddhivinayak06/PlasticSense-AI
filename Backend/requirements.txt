@@ -7,3 +7,6 @@ sqlalchemy>=2.0.0,<3.0.0
 alembic>=1.13.0,<2.0.0
 psycopg2-binary>=2.9.9,<3.0.0
 python-multipart>=0.0.9,<1.0.0
+ultralytics>=8.0.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0

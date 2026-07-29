@@ -6,7 +6,7 @@ from app.application.services.risk_service import RiskService
 from app.infrastructure.database.repositories.detection_repository import DetectionRepository
 from app.infrastructure.database.repositories.risk_repository import RiskRepository
 from app.infrastructure.database.session import SessionLocal
-from app.infrastructure.ml_client.yolo_ml_client import YoloMLClient
+from app.infrastructure.ml_client.yolo_ml_client import LocalYoloMLClient
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -29,13 +29,13 @@ def get_risk_service(repo: RiskRepository = Depends(get_risk_repository)) -> Ris
     return RiskService(repository=repo)
 
 
-def get_ml_client() -> YoloMLClient:
-    return YoloMLClient()
+def get_ml_client() -> LocalYoloMLClient:
+    return LocalYoloMLClient()
 
 
 def get_detection_service(
     repo: DetectionRepository = Depends(get_detection_repository),
-    ml_client: YoloMLClient = Depends(get_ml_client),
+    ml_client: LocalYoloMLClient = Depends(get_ml_client),
     risk_service: RiskService = Depends(get_risk_service),
 ) -> DetectionService:
     return DetectionService(repository=repo, ml_client=ml_client, risk_service=risk_service)
