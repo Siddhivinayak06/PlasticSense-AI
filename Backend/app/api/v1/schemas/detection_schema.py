@@ -1,9 +1,11 @@
 from datetime import datetime
 from typing import Any, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DetectionItemSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: Optional[str] = None
     waste_type: str
     confidence: float
@@ -14,6 +16,8 @@ class DetectionItemSchema(BaseModel):
 
 
 class DetectionSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     image_url: str
     latitude: float
@@ -23,6 +27,7 @@ class DetectionSchema(BaseModel):
     failure_reason: Optional[str] = None
     items: List[DetectionItemSchema] = []
     created_at: datetime
+
 
 
 class PaginationMeta(BaseModel):

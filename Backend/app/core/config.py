@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str
+    POSTGRES_PASSWORD: Optional[str] = "postgres"
     POSTGRES_DB: str = "plasticsense_db"
-    DATABASE_URL: Optional[str] = None
+    DATABASE_URL: Optional[str] = "sqlite:///./plasticsense.db"
 
     # Storage Settings
     UPLOAD_DIR: str = "uploads"
@@ -47,14 +47,8 @@ class Settings(BaseSettings):
             return v
         raise ValueError(v)
 
-    @field_validator("DATABASE_URL")
-    @classmethod
-    def require_postgresql(cls, value: Optional[str]) -> Optional[str]:
-        if value and not value.startswith(("postgresql://", "postgresql+psycopg2://")):
-            raise ValueError("DATABASE_URL must use PostgreSQL; SQLite is not supported in Sprint 2.")
-        return value
-
     model_config = SettingsConfigDict(
+
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,

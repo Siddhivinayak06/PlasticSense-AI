@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Users,
   Settings,
+  ScanLine,
 } from 'lucide-react';
 import type { SidebarMenuGroup } from '@/types/dashboard';
 
@@ -14,6 +15,12 @@ export const sidebarMenuGroups: SidebarMenuGroup[] = [
   {
     title: 'Overview',
     items: [
+      {
+        id: 'detect',
+        label: 'Detect Plastic',
+        icon: ScanLine,
+        href: '/detect',
+      },
       {
         id: 'dashboard',
         label: 'Dashboard',

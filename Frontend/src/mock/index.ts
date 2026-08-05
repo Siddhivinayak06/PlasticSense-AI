@@ -16,6 +16,7 @@ import {
   BarChart3,
   FileBarChart,
   Users,
+  ScanLine,
 } from 'lucide-react';
 import type {
   DashboardStat,
@@ -296,6 +297,15 @@ export const notifications: Notification[] = [
 // ─── Quick Actions ──────────────────────────────────────────────
 
 export const quickActions: QuickAction[] = [
+  {
+    id: 'detect-plastic',
+    label: 'Detect Plastic',
+    description: 'Upload image for AI detection',
+    icon: ScanLine,
+    href: '/detect',
+    color: 'bg-primary/10 dark:bg-primary/20',
+    iconColor: 'text-primary',
+  },
   {
     id: 'create-report',
     label: 'Create Report',

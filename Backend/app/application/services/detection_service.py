@@ -10,8 +10,11 @@ from app.domain.entities.detection import Detection
 from app.domain.entities.location import Location
 from app.infrastructure.external.storage_client import LocalStorageClient
 
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".jfif", ".bmp"}
+ALLOWED_MIME_TYPES = {
+    "image/jpeg", "image/jpg", "image/png", "image/webp",
+    "image/pjpeg", "image/x-png", "application/octet-stream"
+}
 
 
 class DetectionService:
@@ -31,9 +34,13 @@ class DetectionService:
             raise ValueError(f"File size exceeds maximum allowed limit of {settings.MAX_UPLOAD_SIZE_MB}MB")
 
         # Validate file extension & mime type
-        ext = os.path.splitext(dto.filename)[1].lower()
-        if ext not in ALLOWED_EXTENSIONS or dto.content_type not in ALLOWED_MIME_TYPES:
-            raise ValueError(f"Unsupported file type '{ext or dto.content_type}'. Allowed types: JPG, PNG, WEBP")
+        ext = os.path.splitext(dto.filename)[1].lower() if dto.filename else ".jpg"
+        content_type = (dto.content_type or "").lower()
+        is_valid_ext = ext in ALLOWED_EXTENSIONS
+        is_valid_mime = content_type in ALLOWED_MIME_TYPES or content_type.startswith("image/")
+
+        if not (is_valid_ext or is_valid_mime):
+            raise ValueError(f"Unsupported file type '{ext or content_type}'. Allowed types: JPG, PNG, WEBP")
 
         # Store image locally
         image_url = self.storage_client.save_file(dto.file_bytes, dto.filename)

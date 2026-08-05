@@ -29,11 +29,12 @@ MAX_EXPECTED_DENSITY = 60.0
 MAX_HAZARD_WEIGHT = max(HAZARD_WEIGHTS.values())
 
 SEVERITY_LEVELS = [
-    {"min": 0,  "max": 25,  "level": "low"},
-    {"min": 26, "max": 50,  "level": "medium"},
-    {"min": 51, "max": 75,  "level": "high"},
-    {"min": 76, "max": 100, "level": "critical"},
+    {"min": 0.0,  "max": 25.0,  "level": "low"},
+    {"min": 25.0, "max": 50.0,  "level": "medium"},
+    {"min": 50.0, "max": 75.0,  "level": "high"},
+    {"min": 75.0, "max": 100.0, "level": "critical"},
 ]
+
 
 
 class RiskService:
