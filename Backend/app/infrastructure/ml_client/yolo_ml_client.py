@@ -17,6 +17,22 @@ logger = logging.getLogger("PlasticSense_AI")
 class LocalYoloMLClient(IMLClient):
     """Directly executes YOLOv11 inference locally instead of calling an HTTP service."""
     
+    # Map trained YOLO class names to domain WasteType enum
+    MODEL_CLASS_MAPPING = {
+        "plastic_bottle": WasteType.PET_BOTTLE,
+        "PET_bottle": WasteType.PET_BOTTLE,
+        "plastic_bag": WasteType.PLASTIC_BAG,
+        "wrapper": WasteType.FOOD_WRAPPER,
+        "food_wrapper": WasteType.FOOD_WRAPPER,
+        "food_container": WasteType.FOOD_WRAPPER,
+        "styrofoam": WasteType.STYROFOAM,
+        "multilayer_packaging": WasteType.MULTILAYER,
+        "multilayer": WasteType.MULTILAYER,
+        "plastic_cap": WasteType.OTHER,
+        "other_plastic": WasteType.OTHER,
+        "other": WasteType.OTHER,
+    }
+
     def __init__(
         self,
         model_path: str = settings.MODEL_WEIGHTS_PATH,
@@ -58,8 +74,8 @@ class LocalYoloMLClient(IMLClient):
                     conf = float(box.conf.item())
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
                     
-                    label_name = self.class_names.get(cls_id, f"class_{cls_id}")
-                    waste_type = WasteType(label_name) if label_name in WasteType._value2member_map_ else WasteType.OTHER
+                    raw_name = self.class_names.get(cls_id, f"class_{cls_id}")
+                    waste_type = self.MODEL_CLASS_MAPPING.get(raw_name, WasteType.OTHER)
                     
                     items.append(DetectionItem(
                         id=str(uuid.uuid4()),
