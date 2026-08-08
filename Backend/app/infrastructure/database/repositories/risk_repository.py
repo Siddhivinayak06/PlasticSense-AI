@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.application.interfaces.i_risk_repository import IRiskRepository
 from app.domain.entities.risk_assessment import RiskAssessment
-from app.infrastructure.database.models.risk_model import RiskAssessmentModel
+from app.infrastructure.database.models import RiskAssessmentModel
 
 
 class RiskRepository(IRiskRepository):
