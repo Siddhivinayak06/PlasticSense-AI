@@ -1,0 +1,13 @@
+{
+    "plastic": ["plastic_bottle", "plastic_bag", "wrapper", "food_wrapper", "food_container", "plastic_cap", "other_plastic", "bottle_cap", "cup", "lid"],
+    "glass": ["glass_bottle", "broken_glass", "glass_jar"],
+    "metal": ["metal_can", "aerosol_can", "aluminum_foil", "scrap_metal"],
+    "paper": ["paper_cup", "receipt", "paper_bag", "magazine", "newspaper", "normal_paper"],
+    "cardboard": ["cardboard_box", "corrugated_carton", "pizza_box", "carton"],
+    "foam": ["styrofoam", "eps_box"],
+    "rubber": ["tire"],
+    "organic": ["food_waste", "leaves"],
+    "textile": ["clothing", "shoe", "fabric"],
+    "wood": ["wood_scrap"],
+    "other": ["multilayer", "multilayer_packaging", "other", "unknown"]
+}

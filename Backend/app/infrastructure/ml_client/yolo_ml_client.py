@@ -5,10 +5,11 @@ import numpy as np
 import cv2
 from ultralytics import YOLO
 
+import json
+import time
 from app.application.interfaces.i_ml_client import IMLClient, MLClientError, MLPrediction
 from app.core.config import settings
 from app.domain.entities.detection import DetectionItem
-from app.domain.enums.waste_type import WasteType
 
 import logging
 logger = logging.getLogger("PlasticSense_AI")
@@ -17,21 +18,8 @@ logger = logging.getLogger("PlasticSense_AI")
 class LocalYoloMLClient(IMLClient):
     """Directly executes YOLOv11 inference locally instead of calling an HTTP service."""
     
-    # Map trained YOLO class names to domain WasteType enum
-    MODEL_CLASS_MAPPING = {
-        "plastic_bottle": WasteType.PET_BOTTLE,
-        "PET_bottle": WasteType.PET_BOTTLE,
-        "plastic_bag": WasteType.PLASTIC_BAG,
-        "wrapper": WasteType.FOOD_WRAPPER,
-        "food_wrapper": WasteType.FOOD_WRAPPER,
-        "food_container": WasteType.FOOD_WRAPPER,
-        "styrofoam": WasteType.STYROFOAM,
-        "multilayer_packaging": WasteType.MULTILAYER,
-        "multilayer": WasteType.MULTILAYER,
-        "plastic_cap": WasteType.OTHER,
-        "other_plastic": WasteType.OTHER,
-        "other": WasteType.OTHER,
-    }
+    # We load mappings from waste_mapping.json instead of hardcoding
+    MAPPING_PATH = "app/core/waste_mapping.json"
 
     def __init__(
         self,
@@ -41,6 +29,19 @@ class LocalYoloMLClient(IMLClient):
     ):
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
+        self.image_size = settings.IMAGE_SIZE
+
+        # Load waste mapping
+        self.waste_mapping = {}
+        try:
+            with open(self.MAPPING_PATH, 'r') as f:
+                mapping_dict = json.load(f)
+                for group, classes in mapping_dict.items():
+                    for cls in classes:
+                        self.waste_mapping[cls.lower()] = group
+            logger.info("Loaded waste group mappings successfully.")
+        except Exception as e:
+            logger.warning(f"Failed to load waste mapping from {self.MAPPING_PATH}: {e}. Will fallback to 'unknown'.")
         
         try:
             self.model = YOLO(model_path)
@@ -60,26 +61,37 @@ class LocalYoloMLClient(IMLClient):
                 raise MLClientError("Failed to decode image bytes")
                 
             # Run YOLO inference
+            start_time = time.time()
             results = self.model.predict(
                 source=img,
                 conf=self.conf_threshold,
                 iou=self.iou_threshold,
+                imgsz=self.image_size,
                 verbose=False,
             )
+            processing_time_ms = int((time.time() - start_time) * 1000)
             
             items = []
+            annotated_image_bytes = None
             if len(results) > 0 and results[0].boxes is not None:
+                # Generate annotated image using Ultralytics plot()
+                annotated_img = results[0].plot(labels=True, conf=True, line_width=2)
+                success, encoded_img = cv2.imencode('.jpg', annotated_img)
+                if success:
+                    annotated_image_bytes = encoded_img.tobytes()
+
                 for box in results[0].boxes:
                     cls_id = int(box.cls.item())
                     conf = float(box.conf.item())
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
                     
                     raw_name = self.class_names.get(cls_id, f"class_{cls_id}")
-                    waste_type = self.MODEL_CLASS_MAPPING.get(raw_name, WasteType.OTHER)
+                    waste_group = self.waste_mapping.get(raw_name.lower(), "unknown")
                     
                     items.append(DetectionItem(
                         id=str(uuid.uuid4()),
-                        waste_type=waste_type,
+                        class_name=raw_name,
+                        waste_group=waste_group,
                         confidence=conf,
                         bbox_x=float(x1),
                         bbox_y=float(y1),
@@ -87,7 +99,12 @@ class LocalYoloMLClient(IMLClient):
                         bbox_h=float(y2 - y1),
                     ))
                     
-            return MLPrediction(model_version="v1.0-yolov11", items=items)
+            return MLPrediction(
+                model_version="v1.0-yolov11", 
+                items=items,
+                annotated_image_bytes=annotated_image_bytes,
+                processing_time_ms=processing_time_ms
+            )
             
         except Exception as e:
             raise MLClientError(f"Inference failed: {str(e)}") from e

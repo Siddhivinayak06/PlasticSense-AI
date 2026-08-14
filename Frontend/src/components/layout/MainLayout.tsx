@@ -12,8 +12,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       <MobileDrawer />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Navbar />
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6">
-          {children}
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto w-full">
+            {children}
+          </div>
         </main>
         <Footer />
       </div>

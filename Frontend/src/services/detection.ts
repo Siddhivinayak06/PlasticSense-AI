@@ -1,12 +1,18 @@
-import axios from 'axios';
-import type { DetectionEnvelope, RiskEnvelope } from '@/types/detection';
+import type { DetectionEnvelope, RiskEnvelope, Detection, MapDetectionEnvelope } from '@/types/detection';
+import { api, resolveImageUrl } from '@/lib/api';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000';
+export interface PaginatedDetections {
+  data: Detection[];
+  meta: {
+    page: number;
+    limit: number;
+    total_items: number;
+    total_pages: number;
+  };
+  error: string | null;
+}
 
-const api = axios.create({
-  baseURL: `${BASE_URL}/api/v1`,
-  timeout: 120_000, // 2 min — YOLO inference can be slow on CPU
-});
+export { resolveImageUrl };
 
 /**
  * Submit an image + GPS coordinates to the detection endpoint.
@@ -14,16 +20,16 @@ const api = axios.create({
  */
 export async function submitDetection(
   file: File,
-  latitude: number,
-  longitude: number,
-): Promise<DetectionEnvelope> {
+  latitude: number | null,
+  longitude: number | null,
+): Promise<Detection> {
   const form = new FormData();
   form.append('image', file);
   form.append('file', file);
-  form.append('latitude', String(latitude));
-  form.append('longitude', String(longitude));
+  if (latitude !== null) form.append('latitude', String(latitude));
+  if (longitude !== null) form.append('longitude', String(longitude));
 
-  const { data } = await api.post<DetectionEnvelope>('/detections', form, {
+  const { data } = await api.post<Detection>('/detections/detect', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;
@@ -38,14 +44,27 @@ export async function fetchRiskAssessment(detectionId: string): Promise<RiskEnve
 }
 
 /**
- * Build a URL that resolves the backend-relative image path to a full URL.
+ * Fetch a paginated list of detections.
  */
-export function resolveImageUrl(imagePath: string): string {
-  if (!imagePath) return '';
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
-  return `${BASE_URL}${path}`;
+export async function fetchDetections(page = 1, limit = 10): Promise<PaginatedDetections> {
+  const { data } = await api.get<PaginatedDetections>('/detections', {
+    params: { page, limit },
+  });
+  return data;
 }
 
+/**
+ * Fetch a single detection by ID.
+ */
+export async function fetchDetection(id: string): Promise<DetectionEnvelope> {
+  const { data } = await api.get<DetectionEnvelope>(`/detections/${id}`);
+  return data;
+}
+
+/**
+ * Fetch detections for the map view (only those with coordinates).
+ */
+export async function fetchMapDetections(): Promise<MapDetectionEnvelope> {
+  const { data } = await api.get<MapDetectionEnvelope>('/detections/map');
+  return data;
+}

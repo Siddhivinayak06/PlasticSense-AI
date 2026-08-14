@@ -1,111 +1,111 @@
+'use client';
+
 import { Hotspot } from '@/types/hotspot';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, AlertTriangle, Droplets, ArrowRight } from 'lucide-react';
+import { MapPin, AlertTriangle, ArrowRight, ClipboardList, Flag } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { SeverityBadge } from '@/components/shared/SeverityBadge';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { CreateAssignmentDialog } from '@/features/assignments/CreateAssignmentDialog';
 
 interface HotspotCardProps {
   hotspot: Hotspot;
   index?: number;
 }
 
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case 'critical': return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20';
-    case 'high': return 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20';
-    case 'medium': return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
-    case 'low': return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20';
-    default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
-  }
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'pending': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
-    case 'in-progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-    case 'resolved': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
-    case 'verified': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-};
-
 export const HotspotCard = ({ hotspot, index = 0 }: HotspotCardProps) => {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
+      transition={{ duration: 0.3, delay: index * 0.04 }}
+      className="glass rounded-2xl p-5 flex flex-col h-full hover:shadow-lg transition-all"
     >
-      <Card className="h-full flex flex-col hover:border-blue-500/50 transition-colors duration-300">
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-start gap-4">
-            <div>
-              <CardTitle className="text-lg font-semibold line-clamp-1" title={hotspot.name}>
-                {hotspot.name}
-              </CardTitle>
-              <div className="text-sm text-muted-foreground flex items-center mt-1">
-                <MapPin className="w-3 h-3 mr-1" />
-                <span className="truncate">{hotspot.location.city}</span>
-              </div>
-            </div>
-            <Badge variant="outline" className={`shrink-0 capitalize ${getPriorityColor(hotspot.priority)}`}>
-              {hotspot.priority}
-            </Badge>
+      <div className="flex justify-between items-start gap-4 mb-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground line-clamp-1" title={hotspot.name}>
+            {hotspot.name}
+          </h3>
+          <div className="text-xs text-muted-foreground flex items-center mt-1 gap-1">
+            <MapPin className="size-3 shrink-0" />
+            <span className="truncate">{hotspot.location.city}</span>
           </div>
-        </CardHeader>
-        <CardContent className="flex-1 pb-4">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">Reports</span>
-              <span className="font-semibold">{hotspot.reportCount}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">Severity Score</span>
-              <span className="font-semibold text-red-500">{hotspot.severityScore}/100</span>
-            </div>
-          </div>
-          
-          <div className="mb-4">
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-muted-foreground">Cleanup Progress</span>
-              <span className="font-medium">{hotspot.cleanupProgress}%</span>
-            </div>
-            <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
-              <div 
-                className={`h-full ${hotspot.cleanupProgress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} 
-                style={{ width: `${hotspot.cleanupProgress}%` }}
-              />
-            </div>
-          </div>
+        </div>
+        <SeverityBadge severity={hotspot.priority} size="sm" className="shrink-0" />
+      </div>
 
-          <div className="flex flex-wrap gap-2 mt-4">
-            {hotspot.plasticTypes.slice(0, 2).map((type, i) => (
-              <Badge key={i} variant="secondary" className="text-[10px] py-0">
-                {type}
-              </Badge>
-            ))}
-            {hotspot.plasticTypes.length > 2 && (
-              <Badge variant="secondary" className="text-[10px] py-0">
-                +{hotspot.plasticTypes.length - 2}
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-        <CardFooter className="pt-0 flex justify-between items-center border-t border-border/50 mt-4 px-6 py-4">
-          <Badge variant="outline" className={`capitalize border-0 ${getStatusColor(hotspot.status)}`}>
-            {hotspot.status.replace('-', ' ')}
-          </Badge>
-          
-          <Link href={`/hotspots/${hotspot.id}`}>
-            <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-500/10 p-0 h-auto gap-1">
-              Quick View
-              <ArrowRight className="w-4 h-4" />
+      <div className="grid grid-cols-2 gap-4 mb-4 mt-2">
+        <div className="flex flex-col bg-muted/30 rounded-xl p-2.5">
+          <span className="text-[10px] uppercase font-medium text-muted-foreground">Reports</span>
+          <span className="font-semibold text-sm">{hotspot.reportCount}</span>
+        </div>
+        <div className="flex flex-col bg-muted/30 rounded-xl p-2.5">
+          <span className="text-[10px] uppercase font-medium text-muted-foreground">Score</span>
+          <span className="font-semibold text-sm">{hotspot.severityScore}/100</span>
+        </div>
+      </div>
+      
+      <div className="mb-4">
+        <div className="flex justify-between text-xs mb-1.5">
+          <span className="text-muted-foreground font-medium">Cleanup Progress</span>
+          <span className="font-semibold">{hotspot.cleanupProgress}%</span>
+        </div>
+        <div className="w-full bg-muted/60 rounded-full h-1.5 overflow-hidden">
+          <div 
+            className={`h-full ${hotspot.cleanupProgress === 100 ? 'bg-emerald-500' : 'bg-primary'}`} 
+            style={{ width: `${hotspot.cleanupProgress}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1 mb-4">
+        <span className="text-[10px] uppercase font-medium text-muted-foreground">Waste Detected</span>
+        <div className="flex flex-wrap gap-1.5">
+          {hotspot.plasticTypes.slice(0, 3).map((type, i) => (
+            <Badge key={i} variant="secondary" className="text-[10px] py-0 px-2 font-medium bg-background/50 border-border/50">
+              {type}
+            </Badge>
+          ))}
+          {hotspot.plasticTypes.length > 3 && (
+            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium bg-background/50 border-border/50">
+              +{hotspot.plasticTypes.length - 3}
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-auto pt-4 border-t border-border/50 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <StatusBadge status={hotspot.status} size="sm" />
+          <span className="text-[10px] text-muted-foreground">
+            Updated {new Date(hotspot.lastUpdated).toLocaleDateString()}
+          </span>
+        </div>
+        
+        <div className="flex gap-2">
+          <Link href={`/hotspots/${hotspot.id}`} className="flex-1">
+            <Button variant="outline" size="xs" className="w-full text-xs">
+              View
             </Button>
           </Link>
-        </CardFooter>
-      </Card>
+          <div className="flex-1">
+            <CreateAssignmentDialog 
+              hotspotId={hotspot.id} 
+              trigger={
+                <Button variant="default" size="xs" className="w-full text-xs gap-1">
+                  <ClipboardList className="size-3" />
+                  Assign
+                </Button>
+              }
+            />
+          </div>
+          <Button variant="secondary" size="icon-sm" className="shrink-0" title="Mark Priority">
+            <Flag className="size-3.5 text-muted-foreground" />
+          </Button>
+        </div>
+      </div>
     </motion.div>
   );
 };

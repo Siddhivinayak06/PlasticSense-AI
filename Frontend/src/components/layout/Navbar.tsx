@@ -44,6 +44,14 @@ export function Navbar() {
               )}
             </span>
           ))}
+          
+          <div className="ml-4 flex items-center px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-semibold text-amber-600 dark:text-amber-500 tracking-wider uppercase">
+            <span className="relative flex size-1.5 mr-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full size-1.5 bg-amber-500"></span>
+            </span>
+            Demo Mode
+          </div>
         </nav>
       </div>
 

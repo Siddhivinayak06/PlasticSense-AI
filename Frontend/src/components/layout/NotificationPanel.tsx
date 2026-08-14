@@ -1,135 +1,146 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Info, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useState } from 'react';
+import { Bell, CheckCheck, Flame, ClipboardList, ShieldCheck, AlertTriangle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useAppStore } from '@/store';
-import { notifications } from '@/mock';
-import type { NotificationCategory } from '@/types/dashboard';
+import { mockNotifications, type AppNotification } from '@/mock/notifications';
+import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
-const categoryConfig: Record<NotificationCategory, { icon: typeof Info; color: string; badgeClass: string }> = {
-  info: {
-    icon: Info,
-    color: 'text-blue-500',
-    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-  },
-  warning: {
-    icon: AlertTriangle,
-    color: 'text-amber-500',
-    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-  },
-  critical: {
-    icon: AlertCircle,
-    color: 'text-red-500',
-    badgeClass: 'bg-red-500/10 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
-  },
-  success: {
-    icon: CheckCircle2,
-    color: 'text-emerald-500',
-    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-  },
+const CATEGORY_ICONS = {
+  critical: AlertTriangle,
+  warning: Flame,
+  success: ShieldCheck,
+  info: Info,
+};
+
+const CATEGORY_COLORS = {
+  critical: 'text-red-500 bg-red-500/10',
+  warning: 'text-amber-500 bg-amber-500/10',
+  success: 'text-emerald-500 bg-emerald-500/10',
+  info: 'text-blue-500 bg-blue-500/10',
 };
 
 export function NotificationPanel() {
   const { isNotificationOpen, toggleNotification, closeNotification } = useAppStore();
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>(mockNotifications);
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // Close on outside click
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        closeNotification();
-      }
-    }
-    if (isNotificationOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isNotificationOpen, closeNotification]);
+  const markAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const markAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    );
+  };
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative">
       <Button
         variant="ghost"
-        size="icon"
-        aria-label="Notifications"
+        size="icon-sm"
         onClick={toggleNotification}
         className="relative"
+        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
         <Bell className="size-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+          <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
             {unreadCount}
           </span>
         )}
       </Button>
 
-      <AnimatePresence>
-        {isNotificationOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-xl glass p-0 z-50 overflow-hidden"
-          >
+      {isNotificationOpen && (
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-40" onClick={closeNotification} />
+
+          {/* Panel */}
+          <div className="absolute right-0 top-full mt-2 w-[380px] glass rounded-2xl border border-border/50 shadow-xl z-50 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-              <h3 className="text-sm font-semibold">Notifications</h3>
-              <Badge variant="secondary" className="text-xs">
-                {unreadCount} unread
-              </Badge>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
+                <p className="text-[11px] text-muted-foreground">
+                  {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+                </p>
+              </div>
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={markAllAsRead}
+                  className="gap-1.5 text-xs text-muted-foreground"
+                >
+                  <CheckCheck className="size-3.5" />
+                  Mark all read
+                </Button>
+              )}
             </div>
 
-            {/* List */}
-            <div className="max-h-80 overflow-y-auto custom-scrollbar">
-              {notifications.map((notif) => {
-                const config = categoryConfig[notif.category];
-                const Icon = config.icon;
-                return (
-                  <div
-                    key={notif.id}
-                    className={`flex gap-3 px-4 py-3 border-b border-border/30 hover:bg-muted/40 transition-colors cursor-pointer ${
-                      !notif.read ? 'bg-primary/[0.03]' : ''
-                    }`}
-                  >
-                    <div className={`mt-0.5 shrink-0 ${config.color}`}>
-                      <Icon className="size-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium truncate">{notif.title}</span>
-                        <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${config.badgeClass}`}>
-                          {notif.category}
-                        </span>
+            {/* Notifications list */}
+            <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Bell className="size-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-sm text-muted-foreground">No notifications</p>
+                </div>
+              ) : (
+                notifications.map((notif) => {
+                  const Icon = CATEGORY_ICONS[notif.category];
+                  const colorCls = CATEGORY_COLORS[notif.category];
+
+                  const content = (
+                    <div
+                      key={notif.id}
+                      onClick={() => markAsRead(notif.id)}
+                      className={cn(
+                        'flex gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer border-l-2',
+                        notif.read
+                          ? 'border-transparent'
+                          : notif.category === 'critical'
+                            ? 'border-red-500 bg-red-500/5'
+                            : 'border-primary bg-primary/5',
+                      )}
+                    >
+                      <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', colorCls)}>
+                        <Icon className="size-4" />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                        {notif.message}
-                      </p>
-                      <span className="text-[10px] text-muted-foreground/70 mt-1 block">
-                        {notif.timestamp}
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          'text-sm leading-snug',
+                          notif.read ? 'text-muted-foreground' : 'text-foreground font-medium',
+                        )}>
+                          {notif.title}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
+                        <span className="text-[10px] text-muted-foreground/60 mt-1 block">{notif.timestamp}</span>
+                      </div>
+                      {!notif.read && (
+                        <div className="size-2 rounded-full bg-primary shrink-0 mt-1.5" />
+                      )}
                     </div>
-                    {!notif.read && (
-                      <span className="mt-1.5 size-2 rounded-full bg-primary shrink-0" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  );
 
-            {/* Footer */}
-            <div className="px-4 py-2.5 border-t border-border/50 text-center">
-              <button className="text-xs font-medium text-primary hover:underline">
-                View all notifications
-              </button>
+                  if (notif.actionHref) {
+                    return (
+                      <Link key={notif.id} href={notif.actionHref} onClick={closeNotification}>
+                        {content}
+                      </Link>
+                    );
+                  }
+                  return content;
+                })
+              )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </>
+      )}
     </div>
   );
 }

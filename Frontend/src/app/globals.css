@@ -50,8 +50,22 @@
   --popover: rgba(255, 255, 255, 0.8);
   --popover-foreground: #0f172a;
   --radius: 16px;
-  --sidebar-width: 260px;
+  --sidebar-width: 240px;
   --sidebar-collapsed-width: 72px;
+
+  /* Severity colors */
+  --severity-low: #10b981;
+  --severity-medium: #f59e0b;
+  --severity-high: #f97316;
+  --severity-critical: #ef4444;
+
+  /* Status colors */
+  --status-pending: #f59e0b;
+  --status-assigned: #8b5cf6;
+  --status-in-progress: #06b6d4;
+  --status-completed: #10b981;
+  --status-verified: #3b82f6;
+  --status-rejected: #ef4444;
 }
 
 .dark {
@@ -74,6 +88,11 @@
   --card-foreground: #f8fafc;
   --popover: rgba(30, 41, 59, 0.8);
   --popover-foreground: #f8fafc;
+
+  --severity-low: #34d399;
+  --severity-medium: #fbbf24;
+  --severity-high: #fb923c;
+  --severity-critical: #f87171;
 }
 
 @layer base {
@@ -108,4 +127,32 @@
 .sidebar-transition {
   transition: width 200ms cubic-bezier(0.4, 0, 0.2, 1),
               padding 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Pulse glow for urgent items */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 0 12px 4px rgba(239, 68, 68, 0.15); }
+}
+.pulse-urgent {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(148,163,184,0.08) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Score ring animation */
+@keyframes score-fill {
+  from { stroke-dashoffset: 283; }
+}
+.score-ring {
+  animation: score-fill 1s ease-out forwards;
 }

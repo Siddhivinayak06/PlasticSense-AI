@@ -5,8 +5,8 @@ from typing import List, Optional
 
 @dataclass
 class DetectionCreateDTO:
-    latitude: float
-    longitude: float
+    latitude: Optional[float]
+    longitude: Optional[float]
     filename: str
     content_type: str
     file_bytes: bytes
@@ -15,7 +15,8 @@ class DetectionCreateDTO:
 @dataclass
 class DetectionItemDTO:
     id: Optional[str]
-    waste_type: str
+    class_name: str
+    waste_group: str
     confidence: float
     bbox_x: float
     bbox_y: float
@@ -27,10 +28,15 @@ class DetectionItemDTO:
 class DetectionResponseDTO:
     id: str
     image_url: str
-    latitude: float
-    longitude: float
+    annotated_image_url: Optional[str]
+    latitude: Optional[float]
+    longitude: Optional[float]
+    location_source: Optional[str]
+    location_confidence: Optional[float]
     model_version: str
     detection_status: str
     failure_reason: Optional[str]
     items: List[DetectionItemDTO]
     created_at: datetime
+    processing_time_ms: Optional[int]
+    summary: Optional[dict]

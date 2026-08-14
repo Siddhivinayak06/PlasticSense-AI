@@ -8,16 +8,20 @@ from typing import Dict, Any
 from app.application.interfaces.i_risk_repository import IRiskRepository
 from app.domain.entities.detection import Detection
 from app.domain.entities.risk_assessment import RiskAssessment
-from app.domain.enums.waste_type import WasteType
 
-# Hazard Weights matching the notebook logic
+# Hazard Weights based on new waste groups
 HAZARD_WEIGHTS = {
-    WasteType.PET_BOTTLE: 1,
-    WasteType.PLASTIC_BAG: 2,
-    WasteType.FOOD_WRAPPER: 2,
-    WasteType.STYROFOAM: 3,
-    WasteType.MULTILAYER: 4,
-    WasteType.OTHER: 2,
+    "plastic": 3,
+    "glass": 3,
+    "metal": 2,
+    "paper": 1,
+    "cardboard": 1,
+    "organic": 2,
+    "textile": 1,
+    "wood": 1,
+    "rubber": 3,
+    "foam": 4,
+    "other": 2,
 }
 
 W_COUNT = 0.35
@@ -49,7 +53,9 @@ class RiskService:
         
         density_score = self._calculate_density(detection, img_w, img_h)
         hazard_score = self._calculate_hazard(detection)
-        waterbody_score = self._check_waterbody_proximity(detection.location.latitude, detection.location.longitude)
+        lat = detection.location.latitude if detection.location else None
+        lon = detection.location.longitude if detection.location else None
+        waterbody_score = self._check_waterbody_proximity(lat, lon)
         count_score = min(len(detection.items) / MAX_EXPECTED_OBJECTS * 100.0, 100.0)
 
         severity_score = round(
@@ -104,7 +110,7 @@ class RiskService:
     def _calculate_hazard(self, detection: Detection) -> float:
         if not detection.items:
             return 0.0
-        counter = Counter(item.waste_type for item in detection.items)
+        counter = Counter(item.waste_group for item in detection.items)
         raw = sum(cnt * HAZARD_WEIGHTS.get(cls, 2) for cls, cnt in counter.items())
         mx = len(detection.items) * MAX_HAZARD_WEIGHT
         return round(raw / mx * 100.0 if mx else 0.0, 2)

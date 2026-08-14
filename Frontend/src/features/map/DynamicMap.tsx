@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useTheme } from 'next-themes';
 import { MapContainer, TileLayer, Marker, useMap, Circle } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
@@ -96,7 +97,12 @@ function HeatmapLayer({ reports, active }: { reports: Report[]; active: boolean 
 }
 
 export default function DynamicMap({ reports, hotspots, overlays, onHotspotClick, center = [20.5937, 78.9629], zoom = 5 }: DynamicMapProps) {
-  
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const tileUrl = isDark 
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+
   const renderMarkers = () => {
     return reports.map(r => (
       <Marker key={r.id} position={[r.lat, r.lng]} icon={icons[r.severity]}>
@@ -112,14 +118,14 @@ export default function DynamicMap({ reports, hotspots, overlays, onHotspotClick
         zoom={zoom} 
         zoomControl={false}
         className="w-full h-full"
-        style={{ background: '#0f172a' }} // dark background to match theme somewhat
+        style={{ background: isDark ? '#0f172a' : '#f8fafc' }}
       >
         <MapController center={center} zoom={zoom} />
         
-        {/* Base Map (Dark Theme OpenStreetMap via CartoDB) */}
+        {/* Base Map */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url={tileUrl}
         />
 
         {/* Heatmap Layer */}

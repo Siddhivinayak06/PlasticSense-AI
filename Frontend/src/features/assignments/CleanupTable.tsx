@@ -1,114 +1,95 @@
 import { CleanupAssignment } from '@/types/assignment';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, FileText, Eye, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import { SeverityBadge } from '@/components/shared/SeverityBadge';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 
 interface CleanupTableProps {
   assignments: CleanupAssignment[];
+  compact?: boolean;
 }
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'pending': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
-    case 'assigned': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
-    case 'in-progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-    case 'completed': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
-    case 'verified': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
-    case 'closed': return 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-};
-
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case 'critical': return 'text-red-600 dark:text-red-400 font-semibold';
-    case 'high': return 'text-orange-600 dark:text-orange-400 font-semibold';
-    case 'medium': return 'text-amber-600 dark:text-amber-400 font-semibold';
-    case 'low': return 'text-blue-600 dark:text-blue-400 font-semibold';
-    default: return 'text-gray-600 dark:text-gray-400';
-  }
-};
-
-export const CleanupTable = ({ assignments }: CleanupTableProps) => {
+export const CleanupTable = ({ assignments, compact = false }: CleanupTableProps) => {
   return (
-    <div className="rounded-md border border-border">
+    <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden backdrop-blur-sm">
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Cleanup ID</TableHead>
-            <TableHead>Hotspot</TableHead>
-            <TableHead>Assigned NGO</TableHead>
-            <TableHead>Scheduled Date</TableHead>
-            <TableHead>Priority</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Progress</TableHead>
-            <TableHead className="text-right">Action</TableHead>
+        <TableHeader className="bg-muted/50">
+          <TableRow className="border-border/60">
+            <TableHead className="h-10 text-xs font-semibold">ID</TableHead>
+            <TableHead className="h-10 text-xs font-semibold">Hotspot</TableHead>
+            {!compact && <TableHead className="h-10 text-xs font-semibold">Assigned NGO</TableHead>}
+            <TableHead className="h-10 text-xs font-semibold">Scheduled Date</TableHead>
+            {!compact && <TableHead className="h-10 text-xs font-semibold">Priority</TableHead>}
+            <TableHead className="h-10 text-xs font-semibold">Status</TableHead>
+            <TableHead className="h-10 text-xs font-semibold">Progress</TableHead>
+            <TableHead className="h-10 text-xs font-semibold text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {assignments.length > 0 ? (
             assignments.map((assignment) => (
-              <TableRow key={assignment.id}>
-                <TableCell className="font-medium font-mono text-xs">{assignment.id}</TableCell>
-                <TableCell className="max-w-[150px] truncate" title={assignment.hotspotName}>
+              <TableRow key={assignment.id} className="border-border/50 hover:bg-muted/30">
+                <TableCell className="font-mono text-xs text-muted-foreground">{assignment.id}</TableCell>
+                <TableCell className="max-w-[150px] truncate font-medium text-sm" title={assignment.hotspotName}>
                   {assignment.hotspotName}
                 </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{assignment.assignedNgo}</span>
-                    <span className="text-xs text-muted-foreground">{assignment.team.name}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
+                {!compact && (
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">{assignment.assignedNgo}</span>
+                      <span className="text-[11px] text-muted-foreground uppercase">{assignment.team.name}</span>
+                    </div>
+                  </TableCell>
+                )}
+                <TableCell className="text-sm text-muted-foreground">
                   {new Date(assignment.scheduledDate).toLocaleDateString(undefined, {
                     year: 'numeric', month: 'short', day: 'numeric'
                   })}
                 </TableCell>
-                <TableCell className="capitalize">
-                  <span className={getPriorityColor(assignment.priority)}>
-                    {assignment.priority}
-                  </span>
-                </TableCell>
+                {!compact && (
+                  <TableCell>
+                    <SeverityBadge severity={assignment.priority} size="sm" />
+                  </TableCell>
+                )}
                 <TableCell>
-                  <Badge variant="outline" className={`capitalize border-0 ${getStatusColor(assignment.status)}`}>
-                    {assignment.status.replace('-', ' ')}
-                  </Badge>
+                  <StatusBadge status={assignment.status} size="sm" />
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 w-16 bg-secondary rounded-full h-1.5 overflow-hidden">
+                    <div className="flex-1 w-16 bg-muted rounded-full h-1.5 overflow-hidden">
                       <div 
-                        className={`h-full ${assignment.progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} 
+                        className={`h-full ${assignment.progress === 100 ? 'bg-emerald-500' : 'bg-primary'}`} 
                         style={{ width: `${assignment.progress}%` }}
                       />
                     </div>
-                    <span className="text-xs font-medium w-8 text-right">{assignment.progress}%</span>
+                    <span className="text-xs font-semibold w-8 text-right">{assignment.progress}%</span>
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
+                  {/* Using base-ui dropdown menu requires manual classname propagation or careful use */}
+                  {/* Here we use the DropdownMenu provided by shadcn components which in this app requires no asChild for triggers usually */}
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
+                    <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-md border border-transparent hover:bg-muted ml-auto">
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/assignments/${assignment.id}`} className="cursor-pointer flex items-center">
-                          <Eye className="w-4 h-4 mr-2" />
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Actions</DropdownMenuLabel>
+                      <DropdownMenuItem className="p-0">
+                        <Link href={`/assignments/${assignment.id}`} className="cursor-pointer flex items-center w-full px-2 py-1.5 text-sm">
+                          <Eye className="w-4 h-4 mr-2 text-primary" />
                           View Details
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="cursor-pointer flex items-center">
-                        <FileText className="w-4 h-4 mr-2" />
+                      <DropdownMenuItem className="cursor-pointer flex items-center px-2 py-1.5 text-sm">
+                        <FileText className="w-4 h-4 mr-2 text-primary" />
                         Generate Report
                       </DropdownMenuItem>
                       {assignment.status === 'completed' && (
-                        <DropdownMenuItem className="cursor-pointer flex items-center text-emerald-600 dark:text-emerald-400">
+                        <DropdownMenuItem className="cursor-pointer flex items-center px-2 py-1.5 text-sm text-emerald-600 dark:text-emerald-400 focus:text-emerald-700 dark:focus:text-emerald-300">
                           <CheckCircle className="w-4 h-4 mr-2" />
                           Verify Cleanup
                         </DropdownMenuItem>
@@ -120,7 +101,7 @@ export const CleanupTable = ({ assignments }: CleanupTableProps) => {
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={8} className="h-24 text-center">
+              <TableCell colSpan={compact ? 6 : 8} className="h-24 text-center text-sm text-muted-foreground">
                 No cleanup assignments found.
               </TableCell>
             </TableRow>

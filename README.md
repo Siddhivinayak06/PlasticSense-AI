@@ -1,14 +1,14 @@
 # PlasticSense AI 🌍♻️
 
-PlasticSense AI is an intelligent environmental monitoring and management platform that uses computer vision and machine learning to detect, classify, and track plastic waste in real-time. By leveraging the TACO (Trash Annotations in Context) dataset and state-of-the-art YOLOv11 models, it empowers organizations and volunteers to identify pollution hotspots, coordinate cleanup efforts, and analyze environmental trends.
+PlasticSense AI is an intelligent environmental monitoring and management platform that uses computer vision and machine learning to detect, classify, and track **general waste** in real-time. By leveraging the TACO (Trash Annotations in Context) dataset and state-of-the-art YOLOv11 models, it empowers organizations and volunteers to identify pollution hotspots across various categories (plastics, metals, glass, paper, bio), coordinate cleanup efforts, and analyze environmental trends.
 
 ## 🌟 Key Features
 
-- **AI-Powered Waste Detection:** Uses a custom-trained YOLOv11 model to automatically detect and classify different types of plastic waste from images and video feeds.
+- **AI-Powered General Waste Detection:** Uses a custom-trained YOLOv11 model to automatically detect and classify dozens of different types of waste from images.
 - **Interactive Mapping:** Interactive maps with heatmaps and clustering to visualize pollution hotspots globally or locally.
-- **Analytics Dashboard:** Comprehensive analytics for tracking cleanup performance, plastic distribution, and severity over time.
+- **Analytics Dashboard:** Comprehensive analytics for tracking cleanup performance and waste distribution over time.
 - **Task Management:** Assign, track, and manage cleanup operations for volunteers and environmental teams.
-- **Reporting System:** Allow users to submit and manage reports of plastic pollution with image evidence.
+- **History & Reporting System:** Automatically log detections and manage a complete history with annotated bounding-box visual evidence.
 
 ---
 
@@ -25,12 +25,12 @@ A modern, highly interactive dashboard and web application built with:
 
 ### 🧠 Machine Learning (`/Ml-model`)
 A complete pipeline for data processing and model training:
-- **Model:** YOLOv11 (Ultralytics) for high-speed, accurate object detection
-- **Dataset:** TACO (Trash Annotations in Context)
+- **Model:** YOLOv11 (Ultralytics) for high-speed, accurate object detection of ALL TACO categories.
+- **Dataset:** TACO (Trash Annotations in Context) and custom datasets.
 - **Workflow:** Jupyter Notebooks covering dataset downloading, exploration, COCO to YOLO annotation conversion, data augmentation, and model training.
 
 ### ⚙️ Backend (`/Backend`)
-*Currently under development.* Will provide the RESTful API and database integrations to connect the frontend to the ML inference engine and user data.
+FastAPI service implementing Clean Architecture that connects the frontend to the ML inference engine and user data. It natively runs YOLO inferences, caches images, and acts as the single source of truth for detections.
 
 ---
 
@@ -40,7 +40,7 @@ A complete pipeline for data processing and model training:
 PlasticSense-AI/
 ├── Frontend/               # Next.js web application
 │   ├── src/
-│   │   ├── app/            # Next.js App Router pages (analytics, map, reports, dashboard)
+│   │   ├── app/            # Next.js App Router pages (analytics, map, history, dashboard)
 │   │   ├── components/     # Reusable UI components (Shadcn, layouts, charts)
 │   │   ├── features/       # Feature-specific components
 │   │   ├── store/          # Zustand state management
@@ -50,7 +50,7 @@ PlasticSense-AI/
 │   ├── 03_COCO_to_YOLO_Conversion.ipynb
 │   ├── 06_YOLOv11_Training.ipynb
 │   └── dataset_organizer.py
-├── Backend/                # API Services (WIP)
+├── Backend/                # FastAPI Services, YOLO inference, PostgreSQL DB
 └── .gitignore              # Configured for Node, Python, and Jupyter
 ```
 

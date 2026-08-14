@@ -1,82 +1,74 @@
 'use client';
 
 import { Hotspot } from '@/types/hotspot';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
   MapPin, AlertTriangle, Droplets, ArrowLeft, Activity, 
-  TrendingUp, TrendingDown, Minus, Info, ShieldAlert, FileText 
+  TrendingUp, TrendingDown, Minus, Info, ShieldAlert, FileText,
+  ClipboardList, Navigation
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { SeverityBadge } from '@/components/shared/SeverityBadge';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { CreateAssignmentDialog } from '@/features/assignments/CreateAssignmentDialog';
 
 interface HotspotDetailProps {
   hotspot: Hotspot;
 }
 
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case 'critical': return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20';
-    case 'high': return 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20';
-    case 'medium': return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
-    case 'low': return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20';
-    default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
-  }
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'pending': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
-    case 'in-progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-    case 'resolved': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
-    case 'verified': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-};
-
 const TrendIcon = ({ trend }: { trend: string }) => {
-  if (trend === 'increasing') return <TrendingUp className="w-4 h-4 text-red-500" />;
-  if (trend === 'decreasing') return <TrendingDown className="w-4 h-4 text-emerald-500" />;
-  return <Minus className="w-4 h-4 text-amber-500" />;
+  if (trend === 'increasing') return <TrendingUp className="size-4 text-destructive" />;
+  if (trend === 'decreasing') return <TrendingDown className="size-4 text-emerald-500" />;
+  return <Minus className="size-4 text-amber-500" />;
 };
 
 export const HotspotDetail = ({ hotspot }: HotspotDetailProps) => {
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
       {/* Header section */}
       <div className="flex flex-col gap-4 sm:flex-row justify-between items-start sm:items-center">
         <div className="flex items-center gap-4">
           <Link href="/hotspots">
-            <Button variant="outline" size="icon" className="w-8 h-8 rounded-full">
-              <ArrowLeft className="w-4 h-4" />
+            <Button variant="outline" size="icon" className="size-8 rounded-full">
+              <ArrowLeft className="size-4" />
             </Button>
           </Link>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">{hotspot.name}</h1>
-              <Badge variant="outline" className={`capitalize ${getPriorityColor(hotspot.priority)}`}>
-                {hotspot.priority} Priority
-              </Badge>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-bold">{hotspot.name}</h1>
+              <SeverityBadge severity={hotspot.priority} />
             </div>
-            <div className="text-muted-foreground flex items-center gap-2 mt-1">
-              <span className="text-sm font-mono">{hotspot.id}</span>
-              <span>•</span>
-              <div className="flex items-center text-sm">
-                <MapPin className="w-3 h-3 mr-1" />
+            <div className="text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
+              <span className="text-xs font-mono bg-muted/50 px-2 py-0.5 rounded-md">{hotspot.id}</span>
+              <span className="hidden sm:inline">•</span>
+              <div className="flex items-center text-xs">
+                <MapPin className="size-3 mr-1" />
                 {hotspot.location.city}, {hotspot.location.address}
               </div>
             </div>
           </div>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           {hotspot.status !== 'resolved' && hotspot.status !== 'verified' && (
-            <Link href="/assignments">
-              <Button>Assign Team</Button>
-            </Link>
+            <div className="flex-1 sm:flex-none">
+              <CreateAssignmentDialog 
+                hotspotId={hotspot.id} 
+                trigger={
+                  <Button className="w-full gap-2">
+                    <ClipboardList className="size-4" />
+                    Assign Team
+                  </Button>
+                }
+              />
+            </div>
           )}
-          <Button variant="outline">Generate Report</Button>
+          <Button variant="outline" className="flex-1 sm:flex-none gap-2">
+            <FileText className="size-4" />
+            Generate Report
+          </Button>
         </div>
       </div>
 
@@ -86,174 +78,184 @@ export const HotspotDetail = ({ hotspot }: HotspotDetailProps) => {
         <div className="lg:col-span-2 space-y-6">
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-gradient-to-br from-red-500/10 to-transparent border-red-500/20">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-red-600 dark:text-red-400">Severity Score</p>
-                    <p className="text-3xl font-bold">{hotspot.severityScore}<span className="text-lg text-muted-foreground">/100</span></p>
-                  </div>
-                  <div className="p-2 bg-red-500/10 rounded-full">
-                    <Activity className="w-5 h-5 text-red-600 dark:text-red-400" />
-                  </div>
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass rounded-2xl p-5 border-l-4 border-l-destructive bg-destructive/5">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-destructive uppercase tracking-wider">Severity Score</p>
+                  <p className="text-3xl font-bold">{hotspot.severityScore}<span className="text-lg text-muted-foreground font-normal">/100</span></p>
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-br from-blue-500/10 to-transparent border-blue-500/20">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Reports</p>
-                    <p className="text-3xl font-bold">{hotspot.reportCount}</p>
-                  </div>
-                  <div className="p-2 bg-blue-500/10 rounded-full">
-                    <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-amber-500/10 to-transparent border-amber-500/20">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Critical Reports</p>
-                    <p className="text-3xl font-bold">{hotspot.criticalReports}</p>
-                  </div>
-                  <div className="p-2 bg-amber-500/10 rounded-full">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Map Preview</CardTitle>
-              <CardDescription>Estimated area of pollution</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Mock Map Area */}
-              <div className="w-full h-[400px] bg-secondary/50 rounded-xl overflow-hidden relative group border border-border">
-                <div className="absolute inset-0 bg-[url('/placeholder-map.png')] bg-cover bg-center opacity-40 dark:opacity-20 group-hover:opacity-50 transition-opacity"></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                  <div className="w-16 h-16 bg-red-500/20 rounded-full animate-ping absolute"></div>
-                  <div className="w-6 h-6 bg-red-500 rounded-full border-2 border-white dark:border-gray-900 relative z-10 shadow-lg flex items-center justify-center">
-                    <MapPin className="w-3 h-3 text-white" />
-                  </div>
-                </div>
-                <div className="absolute bottom-4 left-4 right-4 bg-background/90 backdrop-blur-md p-3 rounded-lg border border-border/50 text-sm flex justify-between items-center">
-                  <div className="font-mono text-xs text-muted-foreground">
-                    Lat: {hotspot.location.lat.toFixed(4)}<br/>
-                    Lng: {hotspot.location.lng.toFixed(4)}
-                  </div>
-                  <Button variant="secondary" size="sm">Open in Maps</Button>
+                <div className="p-2 bg-destructive/10 rounded-xl">
+                  <Activity className="size-5 text-destructive" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </motion.div>
+            
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass rounded-2xl p-5 border-l-4 border-l-blue-500 bg-blue-500/5">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Total Reports</p>
+                  <p className="text-3xl font-bold">{hotspot.reportCount}</p>
+                </div>
+                <div className="p-2 bg-blue-500/10 rounded-xl">
+                  <FileText className="size-5 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass rounded-2xl p-5 border-l-4 border-l-amber-500 bg-amber-500/5">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Critical Reports</p>
+                  <p className="text-3xl font-bold">{hotspot.criticalReports}</p>
+                </div>
+                <div className="p-2 bg-amber-500/10 rounded-xl">
+                  <AlertTriangle className="size-5 text-amber-600 dark:text-amber-400" />
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass rounded-2xl p-5 space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <MapPin className="size-5 text-primary" />
+                Pollution Map Area
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">Estimated physical boundaries of the reported waste.</p>
+            </div>
+            
+            {/* Mock Map Area */}
+            <div className="w-full h-[400px] bg-secondary/50 rounded-xl overflow-hidden relative group border border-border">
+              {/* Note: the placeholder map image URL is used from standard nextjs assets if available, or just a gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-emerald-500/10 opacity-80" />
+              
+              {/* Radar pulse effect */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+                <div className="size-24 bg-red-500/20 rounded-full animate-ping absolute" />
+                <div className="size-32 bg-red-500/10 rounded-full animate-ping absolute" style={{ animationDelay: '500ms' }} />
+                <div className="size-8 bg-red-500 rounded-full border-2 border-white dark:border-gray-900 relative z-10 shadow-lg flex items-center justify-center">
+                  <MapPin className="size-4 text-white" />
+                </div>
+              </div>
+              
+              <div className="absolute bottom-4 left-4 right-4 bg-background/90 backdrop-blur-md p-3 rounded-xl border border-border/50 text-sm flex justify-between items-center shadow-lg">
+                <div className="font-mono text-xs text-muted-foreground flex flex-col gap-0.5">
+                  <span className="flex items-center gap-1.5"><span className="text-foreground font-medium">Lat:</span> {hotspot.location.lat.toFixed(6)}</span>
+                  <span className="flex items-center gap-1.5"><span className="text-foreground font-medium">Lng:</span> {hotspot.location.lng.toFixed(6)}</span>
+                </div>
+                <Button variant="secondary" size="sm" className="gap-2 text-xs">
+                  <Navigation className="size-3.5" />
+                  View on Full Map
+                </Button>
+              </div>
+            </div>
+          </motion.div>
         </div>
 
         {/* Sidebar (Right col) */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Hotspot Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              
+          <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="glass rounded-2xl p-5 space-y-5">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Activity className="size-5 text-primary" />
+              Hotspot Details
+            </h3>
+            
+            <div className="space-y-4">
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-2">Status</h4>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={`capitalize border-0 ${getStatusColor(hotspot.status)}`}>
-                    {hotspot.status.replace('-', ' ')}
-                  </Badge>
+                <h4 className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-2">Current Status</h4>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={hotspot.status} size="md" />
+                  </div>
                   {hotspot.assignedTeam && (
-                    <span className="text-sm">Assigned to: <span className="font-semibold">{hotspot.assignedTeam}</span></span>
+                    <div className="text-sm bg-muted/40 p-2.5 rounded-lg border border-border/50">
+                      Assigned to: <span className="font-semibold text-foreground">{hotspot.assignedTeam}</span>
+                    </div>
                   )}
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-2">Cleanup Progress</h4>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1 bg-secondary rounded-full h-2 overflow-hidden">
+                <h4 className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-2">Cleanup Progress</h4>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 bg-muted/60 rounded-full h-2 overflow-hidden">
                     <div 
-                      className={`h-full ${hotspot.cleanupProgress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} 
+                      className={`h-full ${hotspot.cleanupProgress === 100 ? 'bg-emerald-500' : 'bg-primary'}`} 
                       style={{ width: `${hotspot.cleanupProgress}%` }}
                     />
                   </div>
-                  <span className="text-sm font-medium w-10 text-right">{hotspot.cleanupProgress}%</span>
+                  <span className="text-sm font-bold w-10 text-right">{hotspot.cleanupProgress}%</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Risk Level</h4>
-                  <div className="flex items-center gap-1">
-                    <ShieldAlert className="w-4 h-4 text-orange-500" />
-                    <span className="capitalize font-medium">{hotspot.riskLevel}</span>
+                  <h4 className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1.5">Risk Level</h4>
+                  <div className="flex items-center gap-1.5">
+                    <ShieldAlert className="size-4 text-orange-500" />
+                    <span className="capitalize font-semibold text-sm">{hotspot.riskLevel}</span>
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Trend</h4>
-                  <div className="flex items-center gap-1">
+                  <h4 className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1.5">Trend</h4>
+                  <div className="flex items-center gap-1.5">
                     <TrendIcon trend={hotspot.trend} />
-                    <span className="capitalize font-medium">{hotspot.trend}</span>
+                    <span className="capitalize font-semibold text-sm">{hotspot.trend}</span>
                   </div>
                 </div>
               </div>
 
               {hotspot.nearbyWaterBody && (
                 <div className="pt-4 border-t border-border/50">
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Nearby Water Body</h4>
+                  <h4 className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1.5">Nearby Water Body</h4>
                   <div className="flex items-center gap-2">
-                    <Droplets className="w-4 h-4 text-blue-500" />
-                    <span className="font-medium">{hotspot.nearbyWaterBody}</span>
+                    <Droplets className="size-4 text-blue-500" />
+                    <span className="font-semibold text-sm">{hotspot.nearbyWaterBody}</span>
                   </div>
                 </div>
               )}
 
               <div className="pt-4 border-t border-border/50">
-                <h4 className="text-sm font-medium text-muted-foreground mb-2">Found Plastic Types</h4>
-                <div className="flex flex-wrap gap-2">
+                <h4 className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-2">Detected Plastics</h4>
+                <div className="flex flex-wrap gap-1.5">
                   {hotspot.plasticTypes.map((type, i) => (
-                    <Badge key={i} variant="secondary" className="font-normal">
+                    <Badge key={i} variant="secondary" className="font-medium bg-muted/50 border-border/50">
                       {type}
                     </Badge>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Most common: <span className="font-semibold">{hotspot.mostCommonPlastic}</span>
-                </p>
+                <div className="mt-3 bg-muted/30 p-2.5 rounded-lg border border-border/50">
+                  <p className="text-xs text-muted-foreground">
+                    Most common: <span className="font-semibold text-foreground">{hotspot.mostCommonPlastic}</span>
+                  </p>
+                </div>
               </div>
+            </div>
+          </motion.div>
 
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Info className="w-4 h-4 text-muted-foreground" />
-                Action & Notes
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="glass rounded-2xl p-5 space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Info className="size-5 text-primary" />
+              NGO Recommendations
+            </h3>
+            
+            <div className="space-y-4">
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-1">Recommended Action</h4>
-                <p className="text-sm bg-secondary/50 p-3 rounded-md border border-border/50">{hotspot.recommendedAction}</p>
+                <h4 className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1.5">Recommended Action</h4>
+                <p className="text-sm bg-primary/5 text-foreground p-3 rounded-xl border border-primary/20">
+                  {hotspot.recommendedAction}
+                </p>
               </div>
               {hotspot.notes && (
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Field Notes</h4>
-                  <p className="text-sm">{hotspot.notes}</p>
+                  <h4 className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1.5">Field Notes</h4>
+                  <p className="text-sm bg-muted/40 text-muted-foreground p-3 rounded-xl border border-border/50 italic">
+                    "{hotspot.notes}"
+                  </p>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
+            </div>
+          </motion.div>
         </div>
       </div>
     </div>

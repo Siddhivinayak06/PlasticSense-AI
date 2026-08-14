@@ -2,7 +2,8 @@
 
 export interface DetectionItem {
   id: string;
-  waste_type: string;
+  class_name: string;
+  waste_group: string;
   confidence: number;
   bbox_x: number;
   bbox_y: number;
@@ -15,13 +16,18 @@ export interface DetectionItem {
 export interface Detection {
   id: string;
   image_url: string;
-  latitude: number;
-  longitude: number;
+  annotated_image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  location_source?: string | null;
+  location_confidence?: number | null;
   model_version: string;
   detection_status: 'pending' | 'completed' | 'failed';
   failure_reason: string | null;
   items: DetectionItem[];
   created_at: string;
+  processing_time_ms: number | null;
+  summary: Record<string, number> | null;
 }
 
 // ─── API Envelope ────────────────────────────────────────────────
@@ -30,6 +36,10 @@ export interface DetectionEnvelope {
   data: Detection;
   meta: Record<string, unknown> | null;
   error: string | null;
+}
+
+export interface MapDetectionEnvelope {
+  detections: Detection[];
 }
 
 // ─── Risk Assessment ─────────────────────────────────────────────

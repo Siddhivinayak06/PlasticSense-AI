@@ -3,6 +3,7 @@ import { CleanupDashboard } from '@/features/assignments/CleanupDashboard';
 import { ClipboardList, CalendarDays, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { CreateAssignmentDialog } from '@/features/assignments/CreateAssignmentDialog';
 
 export default function AssignmentsPage() {
   return (
@@ -20,15 +21,16 @@ export default function AssignmentsPage() {
         
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/assignments/calendar">
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2 bg-background/50">
               <CalendarDays className="w-4 h-4" />
               Calendar View
             </Button>
           </Link>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2 bg-background/50">
             <Download className="w-4 h-4" />
             Export CSV
           </Button>
+          <CreateAssignmentDialog />
         </div>
       </div>
 

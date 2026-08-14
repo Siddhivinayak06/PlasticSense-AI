@@ -28,11 +28,13 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
 
     # ── Storage / ML ──────────────────────────────────────────────────────────
-    UPLOAD_DIR: str = "uploads"
+    UPLOAD_DIR: str = "media/uploads"
+    RESULTS_DIR: str = "media/results"
     MAX_UPLOAD_SIZE_MB: int = 10
-    MODEL_WEIGHTS_PATH: str = "best.pt"
-    CONFIDENCE_THRESHOLD: float = 0.25
+    MODEL_WEIGHTS_PATH: str = "best.onnx"
+    CONFIDENCE_THRESHOLD: float = 0.30
     IOU_THRESHOLD: float = 0.50
+    IMAGE_SIZE: int = 832
 
     @property
     def database_url(self) -> str:

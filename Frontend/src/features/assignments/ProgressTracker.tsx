@@ -8,11 +8,14 @@ interface ProgressTrackerProps {
 
 export const ProgressTracker = ({ timeline }: ProgressTrackerProps) => {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Progress Timeline</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="glass rounded-2xl p-5">
+      <div className="pb-4 border-b border-border/50 mb-4">
+        <h2 className="text-sm font-bold flex items-center gap-2 text-foreground">
+          <CheckCircle2 className="size-4 text-primary" />
+          Progress Timeline
+        </h2>
+      </div>
+      <div>
         <div className="relative pl-6 border-l-2 border-border/50 ml-4 space-y-6">
           {timeline.map((event, index) => {
             const isLast = index === timeline.length - 1;
@@ -25,8 +28,8 @@ export const ProgressTracker = ({ timeline }: ProgressTrackerProps) => {
                       <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                     </div>
                   ) : (
-                    <div className="p-0.5 bg-secondary rounded-full">
-                      <Circle className="w-5 h-5 text-muted-foreground" />
+                    <div className="p-0.5 bg-muted rounded-full">
+                      <Circle className="w-5 h-5 text-muted-foreground/50" />
                     </div>
                   )}
                 </div>
@@ -46,14 +49,14 @@ export const ProgressTracker = ({ timeline }: ProgressTrackerProps) => {
                     <p className="text-xs text-muted-foreground mt-1">Pending</p>
                   )}
                   {event.description && (
-                    <p className="text-sm mt-2">{event.description}</p>
+                    <p className="text-sm mt-2 text-muted-foreground">{event.description}</p>
                   )}
                 </div>
               </div>
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

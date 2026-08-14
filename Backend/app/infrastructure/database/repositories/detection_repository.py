@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from app.application.interfaces.i_detection_repository import IDetectionRepository
 from app.domain.entities.detection import Detection, DetectionItem
 from app.domain.entities.location import Location
-from app.domain.enums.waste_type import WasteType
 from app.infrastructure.database.models.detection_model import DetectionModel, DetectionItemModel
 
 
@@ -15,7 +14,8 @@ class DetectionRepository(IDetectionRepository):
         items = [
             DetectionItem(
                 id=item.id,
-                waste_type=WasteType(item.waste_type) if item.waste_type in WasteType._value2member_map_ else WasteType.OTHER,
+                class_name=item.class_name,
+                waste_group=item.waste_group,
                 confidence=item.confidence,
                 bbox_x=item.bbox_x,
                 bbox_y=item.bbox_y,
@@ -26,8 +26,12 @@ class DetectionRepository(IDetectionRepository):
         ]
         return Detection(
             id=model.id,
-            location=Location(latitude=model.latitude, longitude=model.longitude),
+            location=Location(latitude=model.latitude, longitude=model.longitude) if model.latitude is not None and model.longitude is not None else None,
+            location_source=model.location_source,
+            location_confidence=model.location_confidence,
             image_url=model.image_url,
+            annotated_image_url=model.annotated_image_url,
+            processing_time_ms=model.processing_time_ms,
             model_version=model.model_version,
             detection_status=model.detection_status,
             failure_reason=model.failure_reason,
@@ -39,8 +43,12 @@ class DetectionRepository(IDetectionRepository):
         model = DetectionModel(
             id=detection.id,
             image_url=detection.image_url,
-            latitude=detection.location.latitude,
-            longitude=detection.location.longitude,
+            annotated_image_url=detection.annotated_image_url,
+            processing_time_ms=detection.processing_time_ms,
+            latitude=detection.location.latitude if detection.location else None,
+            longitude=detection.location.longitude if detection.location else None,
+            location_source=detection.location_source,
+            location_confidence=detection.location_confidence,
             model_version=detection.model_version,
             detection_status=detection.detection_status,
             failure_reason=detection.failure_reason,
@@ -51,7 +59,8 @@ class DetectionRepository(IDetectionRepository):
             item_model = DetectionItemModel(
                 id=item.id,
                 detection_id=model.id,
-                waste_type=item.waste_type.value if isinstance(item.waste_type, WasteType) else str(item.waste_type),
+                class_name=item.class_name,
+                waste_group=item.waste_group,
                 confidence=item.confidence,
                 bbox_x=item.bbox_x,
                 bbox_y=item.bbox_y,
@@ -73,12 +82,15 @@ class DetectionRepository(IDetectionRepository):
         model.model_version = detection.model_version
         model.detection_status = detection.detection_status
         model.failure_reason = detection.failure_reason
+        model.annotated_image_url = detection.annotated_image_url
+        model.processing_time_ms = detection.processing_time_ms
         model.items.clear()
         for item in detection.items:
             model.items.append(DetectionItemModel(
                 id=item.id,
                 detection_id=model.id,
-                waste_type=item.waste_type.value if isinstance(item.waste_type, WasteType) else str(item.waste_type),
+                class_name=item.class_name,
+                waste_group=item.waste_group,
                 confidence=item.confidence,
                 bbox_x=item.bbox_x,
                 bbox_y=item.bbox_y,
@@ -106,3 +118,14 @@ class DetectionRepository(IDetectionRepository):
         )
         items = [self._to_domain(m) for m in models]
         return items, total
+
+    def list_map_detections(self) -> List[Detection]:
+        models = (
+            self.db.query(DetectionModel)
+            .filter(DetectionModel.latitude.isnot(None))
+            .filter(DetectionModel.longitude.isnot(None))
+            .order_by(DetectionModel.created_at.desc())
+            .limit(1000)
+            .all()
+        )
+        return [self._to_domain(m) for m in models]

@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Leaf, Calendar } from 'lucide-react';
-import { environmentalQuotes } from '@/mock';
 
 export function WelcomeCard() {
   const now = new Date();
@@ -17,55 +16,34 @@ export function WelcomeCard() {
     day: 'numeric',
   });
 
-  const quote = useMemo(() => {
-    const dayOfYear = Math.floor(
-      (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000
-    );
-    return environmentalQuotes[dayOfYear % environmentalQuotes.length];
-  }, [now]);
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="relative overflow-hidden rounded-2xl glass p-6 sm:p-8"
+      transition={{ duration: 0.4 }}
+      className="flex items-center justify-between gap-4"
     >
-      {/* Background decoration */}
-      <div className="absolute -right-8 -top-8 size-40 rounded-full bg-primary/5 blur-2xl" />
-      <div className="absolute -left-4 -bottom-4 size-32 rounded-full bg-secondary/5 blur-2xl" />
-
-      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
-              <Leaf className="size-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-                {greeting}, Admin! 👋
-              </h1>
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
-                <Calendar className="size-3.5" />
-                <span>{formattedDate}</span>
-              </div>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground/80 italic max-w-xl leading-relaxed mt-3">
-            {quote}
-          </p>
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+          <Leaf className="size-5 text-primary" />
         </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="hidden sm:flex flex-col items-end text-right">
-            <span className="text-2xl font-bold text-primary">92%</span>
-            <span className="text-xs text-muted-foreground">Cleanup Rate</span>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+            {greeting}, Admin 👋
+          </h1>
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
+            <Calendar className="size-3.5" />
+            <span>{formattedDate}</span>
           </div>
-          <div className="hidden sm:block w-px h-10 bg-border/60" />
-          <div className="hidden sm:flex flex-col items-end text-right">
-            <span className="text-2xl font-bold text-secondary">1,284</span>
-            <span className="text-xs text-muted-foreground">Reports Today</span>
-          </div>
+        </div>
+      </div>
+      <div className="hidden sm:flex items-center gap-4">
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground">Platform Status</p>
+          <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <span className="size-2 rounded-full bg-emerald-500 inline-block" />
+            Operational
+          </p>
         </div>
       </div>
     </motion.div>

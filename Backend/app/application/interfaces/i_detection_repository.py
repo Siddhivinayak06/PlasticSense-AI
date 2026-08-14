@@ -23,3 +23,8 @@ class IDetectionRepository(ABC):
     def get_all(self, skip: int = 0, limit: int = 10) -> Tuple[List[Detection], int]:
         """List Detections with pagination. Returns (items, total_count)."""
         pass
+
+    @abstractmethod
+    def list_map_detections(self) -> List[Detection]:
+        """List Detections that have valid GPS coordinates."""
+        pass

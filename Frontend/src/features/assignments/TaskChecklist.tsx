@@ -22,39 +22,42 @@ export const TaskChecklist = ({ tasks: initialTasks }: TaskChecklistProps) => {
   const progress = Math.round((completedCount / tasks.length) * 100) || 0;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <div className="glass rounded-2xl p-5">
+      <div className="pb-3 border-b border-border/50">
         <div className="flex justify-between items-center">
-          <CardTitle>Equipment & Task Checklist</CardTitle>
-          <span className="text-sm font-medium text-muted-foreground">
+          <h2 className="text-sm font-bold flex items-center gap-2">
+            <CheckCircle2 className="size-4 text-primary" />
+            Equipment & Task Checklist
+          </h2>
+          <span className="text-sm font-bold text-foreground bg-primary/10 px-2.5 py-0.5 rounded-full text-primary">
             {completedCount}/{tasks.length}
           </span>
         </div>
-        <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden mt-2">
+        <div className="w-full bg-muted/60 rounded-full h-1.5 overflow-hidden mt-3">
           <div 
-            className={`h-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} 
+            className={`h-full transition-all duration-500 ${progress === 100 ? 'bg-emerald-500' : 'bg-primary'}`} 
             style={{ width: `${progress}%` }}
           />
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </div>
+      <div className="space-y-2 pt-4">
         {tasks.map(task => (
           <div 
             key={task.id} 
-            className="flex items-center gap-3 p-2 hover:bg-secondary/50 rounded-md cursor-pointer transition-colors"
+            className="flex items-center gap-3 p-2.5 hover:bg-muted/30 rounded-xl cursor-pointer transition-colors border border-transparent hover:border-border/50"
             onClick={() => toggleTask(task.id)}
           >
             {task.completed ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+              <CheckCircle2 className="size-5 text-emerald-500 shrink-0" />
             ) : (
-              <Circle className="w-5 h-5 text-muted-foreground shrink-0" />
+              <Circle className="size-5 text-muted-foreground/50 shrink-0" />
             )}
-            <span className={`text-sm ${task.completed ? 'text-muted-foreground line-through' : 'font-medium'}`}>
+            <span className={`text-sm ${task.completed ? 'text-muted-foreground line-through' : 'font-medium text-foreground'}`}>
               {task.label}
             </span>
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

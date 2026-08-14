@@ -1,19 +1,61 @@
+'use client';
 
-import { FolderX } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
+import { FileQuestion } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 interface EmptyStateProps {
-  title?: string;
-  description?: string;
+  icon?: LucideIcon;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  actionHref?: string;
+  onAction?: () => void;
+  className?: string;
 }
 
-export function EmptyState({ title = 'No results found', description = 'We could not find any data matching your criteria.' }: EmptyStateProps) {
+export function EmptyState({
+  icon: Icon = FileQuestion,
+  title,
+  description,
+  actionLabel,
+  actionHref,
+  onAction,
+  className,
+}: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center p-8 text-center bg-white/40 backdrop-blur-md rounded-2xl border border-white/20 shadow-sm min-h-[300px]">
-      <div className="p-4 bg-primary/10 rounded-full mb-4">
-        <FolderX className="h-8 w-8 text-primary" />
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn(
+        'flex flex-col items-center justify-center py-16 px-6 text-center',
+        className,
+      )}
+    >
+      <div className="flex size-16 items-center justify-center rounded-2xl bg-muted/50 mb-4">
+        <Icon className="size-8 text-muted-foreground/40" aria-hidden="true" />
       </div>
-      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-      <p className="text-sm text-muted-foreground mt-2 max-w-sm">{description}</p>
-    </div>
+      <h3 className="text-lg font-semibold text-foreground mb-1.5">{title}</h3>
+      <p className="text-sm text-muted-foreground max-w-md leading-relaxed">{description}</p>
+
+      {actionLabel && (actionHref || onAction) && (
+        <div className="mt-6">
+          {actionHref ? (
+            <Link href={actionHref}>
+              <Button variant="default" size="sm">
+                {actionLabel}
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="default" size="sm" onClick={onAction}>
+              {actionLabel}
+            </Button>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }

@@ -15,5 +15,7 @@ async def health_check():
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
+        "model_loaded": True,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+

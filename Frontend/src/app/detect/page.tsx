@@ -21,28 +21,14 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { submitDetection, fetchRiskAssessment, resolveImageUrl } from '@/services/detection';
-import type { Detection, RiskAssessment, DetectionItem } from '@/types/detection';
+import type { Detection, RiskAssessment } from '@/types/detection';
+import exifr from 'exifr';
 import { cn } from '@/lib/utils';
+import { ImageComparison } from '@/components/shared/ImageComparison';
+import { DetectionCard } from '@/components/shared/DetectionCard';
+import { CleanupRecommendation } from '@/features/dashboard/CleanupRecommendation';
 
 // ─── Helpers ────────────────────────────────────────────────────
-
-const WASTE_LABELS: Record<string, string> = {
-  PET_bottle: 'PET Bottle',
-  plastic_bag: 'Plastic Bag',
-  food_wrapper: 'Food Wrapper',
-  styrofoam: 'Styrofoam',
-  multilayer: 'Multi-layer Plastic',
-  other: 'Other Plastic',
-};
-
-const WASTE_COLORS: Record<string, string> = {
-  PET_bottle: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30',
-  plastic_bag: 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30',
-  food_wrapper: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
-  styrofoam: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30',
-  multilayer: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30',
-  other: 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30',
-};
 
 const RISK_CONFIG = {
   low: { color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/30', bar: 'bg-emerald-500', label: 'Low Risk' },
@@ -50,14 +36,6 @@ const RISK_CONFIG = {
   high: { color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/30', bar: 'bg-orange-500', label: 'High Risk' },
   critical: { color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/30', bar: 'bg-red-500', label: 'Critical Risk' },
 };
-
-function formatLabel(waste_type: string) {
-  return WASTE_LABELS[waste_type] ?? waste_type;
-}
-
-function wasteClass(waste_type: string) {
-  return WASTE_COLORS[waste_type] ?? WASTE_COLORS.other;
-}
 
 // ─── Sub-components ─────────────────────────────────────────────
 
@@ -81,7 +59,7 @@ function UploadZone({
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'relative flex flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed p-12 transition-all cursor-pointer select-none',
+        'relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 transition-all cursor-pointer select-none',
         isDragging
           ? 'border-primary bg-primary/5 scale-[1.01]'
           : 'border-border/60 bg-muted/30 hover:border-primary/50 hover:bg-primary/5',
@@ -133,7 +111,7 @@ function ImagePreview({
       className="relative rounded-2xl overflow-hidden border border-border/50 shadow-lg"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={preview} alt="Preview" className="w-full max-h-72 object-cover" />
+      <img src={preview} alt="Preview" className="w-full h-48 object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
       <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">
         <div>
@@ -155,19 +133,16 @@ function DetectionResults({
   detection,
   risk,
   imageUrl,
+  file,
 }: {
   detection: Detection;
   risk: RiskAssessment | null;
   imageUrl: string;
+  file?: File;
 }) {
-  const riskCfg = risk ? RISK_CONFIG[risk.level] : null;
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
-  // Group items by type
-  const grouped: Record<string, DetectionItem[]> = {};
-  for (const item of detection.items) {
-    grouped[item.waste_type] = grouped[item.waste_type] ?? [];
-    grouped[item.waste_type].push(item);
-  }
+  const riskCfg = risk ? RISK_CONFIG[risk.level] : null;
 
   return (
     <motion.div
@@ -177,120 +152,193 @@ function DetectionResults({
       className="space-y-4"
     >
       {/* Status banner */}
-      <div className="flex items-center gap-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-3">
-        <CheckCircle className="size-4.5 text-emerald-500 shrink-0" />
-        <div>
-          <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Detection Complete</p>
-          <p className="text-xs text-muted-foreground">
-            Found <span className="font-medium text-foreground">{detection.items.length}</span> plastic object{detection.items.length !== 1 ? 's' : ''} ·{' '}
-            Model: <span className="font-medium text-foreground">{detection.model_version}</span>
-          </p>
+      <div className="flex items-center justify-between rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <CheckCircle className="size-4.5 text-emerald-500 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Detection Complete</p>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{detection.items.length}</span> waste object{detection.items.length !== 1 ? 's' : ''} detected
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className="text-xs font-mono text-muted-foreground">
+            {detection.model_version} • {detection.processing_time_ms || 0} ms
+          </span>
         </div>
       </div>
 
-      {/* Detected image */}
-      <div className="rounded-2xl overflow-hidden border border-border/50 shadow">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt="Analysed image" className="w-full max-h-64 object-cover" />
+      {/* Detected image comparison */}
+      <div className="py-2">
+        <ImageComparison 
+          originalImage={imageUrl} 
+          annotatedImage={resolveImageUrl(detection.annotated_image_url) || imageUrl} 
+          items={detection.items}
+          hoveredItemId={hoveredItemId}
+          onItemHover={setHoveredItemId}
+        />
       </div>
 
-      {/* Detected objects */}
+      {/* Detected objects & Waste Summary */}
       {detection.items.length > 0 ? (
-        <div className="glass rounded-2xl p-4 space-y-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Scan className="size-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Detected Objects</h3>
+        <div className="glass rounded-2xl p-4 space-y-4">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Layers className="size-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Waste Summary</h3>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(grouped).map(([type, items]) => (
-              <span
-                key={type}
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium',
-                  wasteClass(type),
-                )}
-              >
-                {formatLabel(type)}
-                <span className="ml-1 size-4 flex items-center justify-center rounded-full bg-current/20 text-[10px] font-bold">
-                  {items.length}
-                </span>
-              </span>
-            ))}
+          
+          <div className="pt-2">
+            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Waste Composition</h4>
+            <div className="space-y-2.5">
+              {detection.summary && Object.entries(detection.summary)
+                .filter(([k]) => k !== 'total_objects')
+                .sort(([, a], [, b]) => b - a)
+                .map(([group, count]) => {
+                  const percentage = Math.round((count / detection.items.length) * 100);
+                  return (
+                    <div key={group} className="flex items-center gap-3">
+                      <div className="w-24 truncate text-[11px] font-medium text-foreground">{group}</div>
+                      <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary rounded-full transition-all duration-1000" 
+                          style={{ width: `${percentage}%` }} 
+                        />
+                      </div>
+                      <div className="w-12 text-right text-[11px] font-semibold text-muted-foreground">{percentage}%</div>
+                    </div>
+                  );
+                })}
+            </div>
           </div>
 
-          {/* Item list */}
-          <div className="space-y-1.5 mt-2 max-h-44 overflow-y-auto custom-scrollbar pr-1">
-            {detection.items.map((item, i) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-muted-foreground w-4">{i + 1}</span>
-                  <span className={cn('rounded-md border px-2 py-0.5 text-[11px] font-medium', wasteClass(item.waste_type))}>
-                    {formatLabel(item.waste_type)}
-                  </span>
-                </div>
-                <span className="text-xs font-semibold text-muted-foreground">
-                  {(item.confidence * 100).toFixed(1)}%
-                </span>
+          <div className="pt-2">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Scan className="size-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Detected Objects</h3>
               </div>
-            ))}
+              <span className="text-[10px] text-muted-foreground">{detection.items.length} total</span>
+            </div>
+            
+            {/* Grouped item list */}
+            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+              {Object.entries(
+                detection.items.reduce((acc, item) => {
+                  if (!acc[item.class_name]) {
+                    acc[item.class_name] = { count: 0, items: [], group: item.waste_group };
+                  }
+                  acc[item.class_name].count += 1;
+                  acc[item.class_name].items.push(item);
+                  return acc;
+                }, {} as Record<string, { count: number; items: DetectionItem[]; group: string }>)
+              )
+              .sort(([, a], [, b]) => b.count - a.count)
+              .map(([className, data]) => {
+                const groupColors: Record<string, string> = {
+                  plastic: 'border-sky-500/30 bg-sky-500/5 text-sky-600 dark:text-sky-400',
+                  glass: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400',
+                  metal: 'border-slate-500/30 bg-slate-500/5 text-slate-600 dark:text-slate-400',
+                  paper: 'border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400',
+                  cardboard: 'border-orange-500/30 bg-orange-500/5 text-orange-600 dark:text-orange-400',
+                };
+                const groupClass = groupColors[data.group.toLowerCase()] || 'border-border/50 bg-muted/20 text-muted-foreground';
+                const avgConfidence = data.items.reduce((sum, i) => sum + i.confidence, 0) / data.count;
+
+                return (
+                  <div 
+                    key={className}
+                    className={`flex items-center justify-between rounded-lg border p-2.5 transition-colors ${groupClass} ${hoveredItemId === className ? 'border-primary shadow-sm' : ''}`}
+                    onMouseEnter={() => setHoveredItemId(className)}
+                    onMouseLeave={() => setHoveredItemId(null)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-foreground capitalize">
+                          {className.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-[9px] font-bold opacity-70 uppercase tracking-wider">
+                          {data.group || 'UNKNOWN'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-end">
+                        <span className="text-xs font-bold">{data.count} objects</span>
+                        <span className="text-[10px] opacity-70">{Math.round(avgConfidence * 100)}% avg conf</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       ) : (
         <div className="flex items-center gap-2.5 rounded-xl bg-muted/40 border border-border/50 px-4 py-3">
           <Info className="size-4 text-muted-foreground shrink-0" />
-          <p className="text-sm text-muted-foreground">No plastic objects detected in this image.</p>
+          <p className="text-sm text-muted-foreground">No waste objects detected. Try another image or a clearer view of the waste.</p>
         </div>
       )}
 
-      {/* Risk Assessment */}
-      {risk && riskCfg && (
-        <div className={cn('glass rounded-2xl p-4 space-y-3 border', riskCfg.bg)}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className={cn('size-4', riskCfg.color)} />
-              <h3 className="text-sm font-semibold text-foreground">Risk Assessment</h3>
-            </div>
-            <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full border', riskCfg.bg, riskCfg.color)}>
-              {riskCfg.label}
-            </span>
-          </div>
-
-          {/* Score bar */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-muted-foreground">Severity Score</span>
-              <span className={cn('text-sm font-bold', riskCfg.color)}>{risk.score.toFixed(1)} / 100</span>
-            </div>
-            <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
-              <motion.div
-                className={cn('h-full rounded-full', riskCfg.bar)}
-                initial={{ width: 0 }}
-                animate={{ width: `${risk.score}%` }}
-                transition={{ duration: 0.8, ease: 'easeOut' }}
-              />
-            </div>
-          </div>
-
-          {/* Factor breakdown */}
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: 'Object Count', value: risk.strategy_breakdown.object_count, icon: Layers },
-              { label: 'Density', value: risk.strategy_breakdown.density, icon: BarChart3 },
-              { label: 'Hazard', value: risk.strategy_breakdown.hazard, icon: Zap },
-              { label: 'Waterbody', value: risk.strategy_breakdown.waterbody, icon: Droplets },
-            ].map(({ label, value, icon: Icon }) => (
-              <div key={label} className="rounded-xl bg-background/40 px-3 py-2 space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <Icon className="size-3 text-muted-foreground" />
-                  <span className="text-[10px] text-muted-foreground">{label}</span>
+      {/* Image Metadata */}
+      <div className="glass rounded-2xl p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Info className="size-4 text-primary" />
+          Image Information
+        </h3>
+        <div className="grid grid-cols-2 gap-y-3 text-xs">
+          {file && (
+            <>
+              <div className="text-muted-foreground">Filename:</div>
+              <div className="font-medium truncate" title={file.name}>{file.name}</div>
+              <div className="text-muted-foreground">File Size:</div>
+              <div className="font-medium">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
+            </>
+          )}
+          <div className="text-muted-foreground">Location:</div>
+          <div className="font-medium">
+            {detection.latitude !== null && detection.longitude !== null ? (
+              <div className="space-y-1.5">
+                {detection.location_source === 'image_exif' ? (
+                  <div className="inline-flex items-center gap-1 text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold text-[10px]">
+                    <MapPin className="size-3" /> Image GPS
+                  </div>
+                ) : detection.location_source === 'image_overlay_ocr' ? (
+                  <div className="inline-flex items-center gap-1 text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold text-[10px]">
+                    <MapPin className="size-3" /> GPS Overlay
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1 text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-semibold text-[10px]">
+                    <MapPin className="size-3" /> Device GPS
+                  </div>
+                )}
+                <div className="font-mono text-[11px] text-foreground">
+                  {detection.latitude.toFixed(6)}, {detection.longitude.toFixed(6)}
                 </div>
-                <p className={cn('text-sm font-bold', riskCfg.color)}>{value.toFixed(1)}</p>
+                <div className="pt-1">
+                  <a href={`/map?lat=${detection.latitude}&lng=${detection.longitude}`} className="text-primary hover:underline text-[10px] inline-flex items-center gap-1">
+                    View on Pollution Map &rarr;
+                  </a>
+                </div>
               </div>
-            ))}
+            ) : (
+              <span className="inline-flex items-center gap-1 text-muted-foreground bg-muted/50 border px-2 py-0.5 rounded-full font-semibold text-[10px]">
+                <MapPin className="size-3" /> No GPS
+              </span>
+            )}
           </div>
+          <div className="text-muted-foreground">Detection Time:</div>
+          <div className="font-medium">{new Date(detection.created_at).toLocaleString()}</div>
+        </div>
+      </div>
+
+      {/* Risk Assessment / Cleanup Recommendation */}
+      {risk && (
+        <div className="pt-2">
+          <CleanupRecommendation risk={risk} wasteCount={detection.items.length} />
         </div>
       )}
     </motion.div>
@@ -309,6 +357,7 @@ export default function DetectPage() {
   const [longitude, setLongitude] = useState('');
   const [useCurrentLocation, setUseCurrentLocation] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [exifStatus, setExifStatus] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
 
   const [state, setState] = useState<UploadState>('idle');
   const [detection, setDetection] = useState<Detection | null>(null);
@@ -317,13 +366,27 @@ export default function DetectPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback((f: File) => {
+  const handleFile = useCallback(async (f: File) => {
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setState('idle');
     setDetection(null);
     setRisk(null);
     setErrorMsg('');
+    setExifStatus('loading');
+    
+    try {
+      const gps = await exifr.gps(f);
+      if (gps && typeof gps.latitude === 'number' && typeof gps.longitude === 'number') {
+        setLatitude(gps.latitude.toFixed(6));
+        setLongitude(gps.longitude.toFixed(6));
+        setExifStatus('found');
+      } else {
+        setExifStatus('not_found');
+      }
+    } catch (e) {
+      setExifStatus('not_found');
+    }
   }, []);
 
   const handleRemove = () => {
@@ -332,6 +395,9 @@ export default function DetectPage() {
     setState('idle');
     setDetection(null);
     setRisk(null);
+    setExifStatus('idle');
+    setLatitude('');
+    setLongitude('');
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -363,14 +429,19 @@ export default function DetectPage() {
   const handleSubmit = async () => {
     if (!file) return;
 
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
-    if (isNaN(lat) || isNaN(lng)) {
-      setErrorMsg('Please enter valid GPS coordinates before scanning.');
+    const lat = latitude ? parseFloat(latitude) : null;
+    const lng = longitude ? parseFloat(longitude) : null;
+    
+    if ((lat !== null && isNaN(lat)) || (lng !== null && isNaN(lng))) {
+      setErrorMsg('Please enter valid GPS coordinates or leave them empty.');
       return;
     }
-    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      setErrorMsg('Coordinates out of range. Latitude: -90 to 90, Longitude: -180 to 180.');
+    if (lat !== null && (lat < -90 || lat > 90)) {
+      setErrorMsg('Latitude out of range.');
+      return;
+    }
+    if (lng !== null && (lng < -180 || lng > 180)) {
+      setErrorMsg('Longitude out of range.');
       return;
     }
 
@@ -380,8 +451,7 @@ export default function DetectPage() {
     setRisk(null);
 
     try {
-      const envelope = await submitDetection(file, lat, lng);
-      const det = envelope.data;
+      const det = await submitDetection(file, lat, lng);
       setDetection(det);
 
       if (det.detection_status === 'completed' && det.items.length > 0) {
@@ -413,11 +483,12 @@ export default function DetectPage() {
     setPreview(null);
     setDetection(null);
     setRisk(null);
-    setState('idle');
-    setErrorMsg('');
+    setExifStatus('idle');
+    setLatitude('');
+    setLongitude('');
   };
 
-  const canSubmit = !!file && latitude !== '' && longitude !== '' && state !== 'detecting';
+  const canSubmit = !!file && state !== 'detecting';
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-6">
@@ -426,11 +497,23 @@ export default function DetectPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <h1 className="text-2xl font-bold text-foreground">Detect Plastic</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Upload an image to run YOLO-based plastic detection and risk assessment in real time.
-        </p>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Waste Detection</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Upload a geotagged image to detect and classify waste using AI.
+          </p>
+        </div>
+        
+        {/* System Status */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+          <div className="relative flex size-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+            <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
+          </div>
+          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">AI System Online</span>
+        </div>
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -466,6 +549,7 @@ export default function DetectPage() {
               <div className="flex items-center gap-2">
                 <MapPin className="size-4 text-primary" />
                 <span className="text-sm font-semibold text-foreground">GPS Coordinates</span>
+                <span className="text-xs text-muted-foreground font-normal ml-1">(Optional)</span>
               </div>
               <Button
                 variant="ghost"
@@ -515,14 +599,25 @@ export default function DetectPage() {
               </div>
             </div>
 
-            {useCurrentLocation && (
-              <p className="text-[11px] text-emerald-500 flex items-center gap-1">
-                <CheckCircle className="size-3" /> Using your current GPS location
+            {useCurrentLocation ? (
+              <p className="text-[11px] text-amber-500 flex items-center gap-1">
+                <MapPin className="size-3" /> 📍 Device GPS Selected
               </p>
-            )}
+            ) : exifStatus === 'loading' ? (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <Loader2 className="size-3 animate-spin" /> Checking image for EXIF GPS...
+              </p>
+            ) : exifStatus === 'found' ? (
+              <p className="text-[11px] text-emerald-500 flex items-center gap-1">
+                <MapPin className="size-3" /> 📍 Image GPS metadata found
+              </p>
+            ) : exifStatus === 'not_found' ? (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <Info className="size-3" /> No EXIF GPS found. The AI will attempt to read GPS overlays, or you can use your device location.
+              </p>
+            ) : null}
           </div>
 
-          {/* Submit */}
           <Button
             id="run-detection-btn"
             className="w-full gap-2"
@@ -531,10 +626,12 @@ export default function DetectPage() {
             disabled={!canSubmit}
           >
             {state === 'detecting' ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Running YOLO Detection…
-              </>
+              <span className="flex flex-col items-center gap-1 py-1">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Processing...
+                </span>
+              </span>
             ) : (
               <>
                 <Scan className="size-4" />
@@ -607,16 +704,19 @@ export default function DetectPage() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="flex flex-col items-center justify-center h-full gap-5 py-16"
+                  className="flex flex-col items-center justify-center h-full gap-6 py-16"
                 >
                   <div className="relative flex size-20 items-center justify-center">
                     <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
                     <div className="absolute inset-0 rounded-full border-4 border-t-primary animate-spin" />
                     <Scan className="size-8 text-primary" />
                   </div>
-                  <div className="text-center space-y-1">
-                    <p className="text-sm font-semibold text-foreground">Running YOLO Inference…</p>
-                    <p className="text-xs text-muted-foreground">This may take a few seconds on CPU</p>
+                  <div className="text-center space-y-1.5 flex flex-col items-center">
+                    <p className="text-sm font-semibold text-foreground animate-pulse">Uploading image...</p>
+                    <p className="text-sm font-semibold text-foreground animate-pulse delay-100">Extracting location...</p>
+                    <p className="text-sm font-semibold text-foreground animate-pulse delay-200">Analyzing waste...</p>
+                    <p className="text-sm font-semibold text-primary animate-pulse delay-300">Running YOLO11...</p>
+                    <p className="text-xs text-muted-foreground mt-2">Generating detection results...</p>
                   </div>
                 </motion.div>
               )}
@@ -647,6 +747,7 @@ export default function DetectPage() {
                   detection={detection}
                   risk={risk}
                   imageUrl={resolveImageUrl(detection.image_url)}
+                  file={file!}
                 />
               )}
             </AnimatePresence>
