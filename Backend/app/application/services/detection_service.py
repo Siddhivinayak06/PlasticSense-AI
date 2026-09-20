@@ -1,14 +1,21 @@
 import os
 import uuid
-from typing import List, Optional, Tuple
-from app.application.dto.detection_dto import DetectionCreateDTO, DetectionResponseDTO, DetectionItemDTO
+from typing import List, Optional, Tuple, Dict, Any
+
+from app.application.dto.detection_dto import (
+    DetectionCreateDTO,
+    DetectionItemDTO,
+    DetectionResponseDTO,
+)
 from app.application.interfaces.i_detection_repository import IDetectionRepository
 from app.application.interfaces.i_ml_client import IMLClient, MLClientError
+from app.application.services.feature_engine import FeatureEngine, StructuredVisualFeatures
+from app.application.services.geolocation_service import extract_gps_from_image
 from app.application.services.risk_service import RiskService
 from app.core.config import settings
 from app.domain.entities.detection import Detection
 from app.domain.entities.location import Location
-from app.application.services.geolocation_service import extract_gps_from_image
+from app.domain.entities.risk_assessment import RiskAssessment
 from app.infrastructure.external.storage_client import LocalStorageClient
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".jfif", ".bmp"}
@@ -19,17 +26,25 @@ ALLOWED_MIME_TYPES = {
 
 
 class DetectionService:
-    def __init__(self, repository: IDetectionRepository, ml_client: IMLClient, risk_service: RiskService, storage_client: Optional[LocalStorageClient] = None):
+    def __init__(
+        self,
+        repository: IDetectionRepository,
+        ml_client: IMLClient,
+        risk_service: RiskService,
+        storage_client: Optional[LocalStorageClient] = None,
+        feature_engine: Optional[FeatureEngine] = None,
+    ):
         self.repository = repository
         self.ml_client = ml_client
         self.risk_service = risk_service
         self.storage_client = storage_client or LocalStorageClient(upload_dir=settings.UPLOAD_DIR)
         self.result_storage_client = LocalStorageClient(upload_dir=settings.RESULTS_DIR)
+        self.feature_engine = feature_engine or FeatureEngine()
 
     def create_detection(self, dto: DetectionCreateDTO) -> DetectionResponseDTO:
         # 1. Extract EXIF GPS
         gps_result = extract_gps_from_image(dto.file_bytes)
-        
+
         # 2. Location Fallback Logic
         location = None
         location_source = None
@@ -58,10 +73,10 @@ class DetectionService:
         if not (is_valid_ext or is_valid_mime):
             raise ValueError(f"Unsupported file type '{ext or content_type}'. Allowed types: JPG, PNG, WEBP")
 
-        # Store image locally
+        # Store original image locally
         image_url = self.storage_client.save_file(dto.file_bytes, dto.filename)
 
-        # Construct Detection domain object with detection_status = "pending"
+        # Construct initial Detection record
         detection = Detection(
             id=str(uuid.uuid4()),
             location=location,
@@ -74,35 +89,53 @@ class DetectionService:
         )
 
         saved = self.repository.save(detection)
+        features: Optional[StructuredVisualFeatures] = None
+        assessment: Optional[RiskAssessment] = None
+
         try:
+            # Run dual-model inference
             prediction = self.ml_client.predict(dto.file_bytes, dto.filename, dto.content_type)
-            
+
             saved.model_version = prediction.model_version
             saved.items = prediction.items
             saved.processing_time_ms = prediction.processing_time_ms
 
+            # Extract structured visual features
+            features = self.feature_engine.extract(
+                detector_result=getattr(prediction, "detector", None),
+                segmenter_result=getattr(prediction, "segmentation", None),
+            )
+
+            # Save annotated visualization image (combined segmentation + boxes)
             if prediction.annotated_image_bytes:
                 result_filename = f"annotated_{dto.filename}"
-                annotated_url = self.result_storage_client.save_file(prediction.annotated_image_bytes, result_filename)
-                # Fix up the URL to point to /media/results instead of /static/uploads (assuming save_file returns hardcoded static/uploads)
+                annotated_url = self.result_storage_client.save_file(
+                    prediction.annotated_image_bytes, result_filename
+                )
                 if "/static/uploads" in annotated_url:
                     annotated_url = annotated_url.replace("/static/uploads", "/media/results")
                 saved.annotated_image_url = annotated_url
 
             saved.detection_status = "completed"
             saved = self.repository.update(saved)
-            self.risk_service.assess(saved)
+
+            # Evaluate deterministic risk with structured features
+            assessment = self.risk_service.assess(saved, features=features)
+
         except MLClientError as error:
             saved.detection_status = "failed"
             saved.failure_reason = str(error)
             saved = self.repository.update(saved)
-        return self._to_dto(saved)
+
+        return self._to_dto(saved, features=features, assessment=assessment)
 
     def get_detection(self, detection_id: str) -> Optional[DetectionResponseDTO]:
         detection = self.repository.get_by_id(detection_id)
         if not detection:
             return None
-        return self._to_dto(detection)
+        # Retrieve associated risk assessment from database
+        assessment = self.risk_service.get_for_detection(detection_id)
+        return self._to_dto(detection, assessment=assessment)
 
     def list_detections(self, page: int = 1, limit: int = 10) -> Tuple[List[DetectionResponseDTO], int]:
         if page < 1:
@@ -111,14 +144,26 @@ class DetectionService:
             limit = 10
         skip = (page - 1) * limit
         items, total = self.repository.get_all(skip=skip, limit=limit)
-        dtos = [self._to_dto(d) for d in items]
+        dtos = []
+        for d in items:
+            assessment = self.risk_service.get_for_detection(d.id) if self.risk_service else None
+            dtos.append(self._to_dto(d, assessment=assessment))
         return dtos, total
 
     def list_map_detections(self) -> List[DetectionResponseDTO]:
         items = self.repository.list_map_detections()
-        return [self._to_dto(d) for d in items]
+        dtos = []
+        for d in items:
+            assessment = self.risk_service.get_for_detection(d.id) if self.risk_service else None
+            dtos.append(self._to_dto(d, assessment=assessment))
+        return dtos
 
-    def _to_dto(self, detection: Detection) -> DetectionResponseDTO:
+    def _to_dto(
+        self,
+        detection: Detection,
+        features: Optional[StructuredVisualFeatures] = None,
+        assessment: Optional[RiskAssessment] = None,
+    ) -> DetectionResponseDTO:
         items_dto = [
             DetectionItemDTO(
                 id=item.id,
@@ -132,18 +177,66 @@ class DetectionService:
             )
             for item in detection.items
         ]
-        
-        summary = None
-        if items_dto:
-            summary = {"total_objects": len(items_dto)}
-            for item in items_dto:
-                group = item.waste_group
-                summary[group] = summary.get(group, 0) + 1
+
+        # Extract breakdown if assessment is present
+        breakdown = assessment.strategy_breakdown if assessment and assessment.strategy_breakdown else {}
+
+        # Resolve waste coverage and material breakdown
+        cov_pct = 0.0
+        mat_cov = {}
+        mat_cnts = {}
+        if features:
+            cov_pct = features.waste_coverage_percent
+            mat_cov = features.material_coverage
+            mat_cnts = features.material_counts
+        elif breakdown:
+            cov_pct = breakdown.get("waste_coverage_percent", 0.0)
+            mat_cov = breakdown.get("material_coverage", {})
+            mat_cnts = breakdown.get("material_counts", {})
+
+        # Build summary dict preserving existing structure (scalars only, no nested dicts)
+        summary: Dict[str, Any] = {
+            "total_objects": len(items_dto),
+            "waste_coverage_percent": cov_pct,
+        }
+        if assessment:
+            summary["risk_score"] = assessment.score
+            summary["severity"] = breakdown.get("severity", assessment.level.upper())
+            summary["cleanup_priority"] = breakdown.get("cleanup_priority", "LOW")
+            summary["explanation"] = breakdown.get("explanation", "")
+
+        for item in items_dto:
+            group = item.waste_group
+            summary[group] = summary.get(group, 0) + 1
+
         # Fix up image_url in case it uses old /static/uploads
         img_url = detection.image_url
         if img_url and "/static/uploads" in img_url:
             img_url = img_url.replace("/static/uploads", "/media/uploads")
-            
+
+        # Segmentation dictionary
+        segmentation_data = {
+            "waste_coverage_percent": cov_pct,
+            "material_coverage": mat_cov,
+            "material_counts": mat_cnts,
+        }
+
+        # Features dictionary
+        features_data = features.to_dict() if features else None
+
+        # Risk assessment dictionary
+        risk_data = None
+        if assessment:
+            risk_data = {
+                "id": assessment.id,
+                "score": assessment.score,
+                "level": assessment.level,
+                "severity": breakdown.get("severity", assessment.level.upper()),
+                "cleanup_priority": breakdown.get("cleanup_priority", "LOW"),
+                "explanation": breakdown.get("explanation", ""),
+                "strategy_breakdown": breakdown,
+            }
+
         return DetectionResponseDTO(
             id=detection.id,
             image_url=img_url,
@@ -159,4 +252,7 @@ class DetectionService:
             created_at=detection.created_at,
             processing_time_ms=detection.processing_time_ms,
             summary=summary,
+            segmentation=segmentation_data,
+            features=features_data,
+            risk=risk_data,
         )

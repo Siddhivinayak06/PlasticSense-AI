@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
@@ -11,8 +11,12 @@ class RiskAssessmentSchema(BaseModel):
     detection_id: str
     score: float
     level: str
-    strategy_breakdown: Dict[str, float]
+    severity: Optional[str] = None
+    cleanup_priority: Optional[str] = None
+    explanation: Optional[str] = None
+    strategy_breakdown: Dict[str, Any]
     computed_at: datetime
+
 
 
 class SingleRiskEnvelope(EnvelopeResponse):

@@ -78,7 +78,12 @@ export interface Report {
   disposalMethod: string;
   statusHistory: StatusHistoryEntry[];
   comments: ReportComment[];
+  riskScore?: number;
+  wasteCoverage?: number;
+  locationSource?: string;
+  materialCounts?: Record<string, number>;
 }
+
 
 // ─── Filter State ───────────────────────────────────────────────
 

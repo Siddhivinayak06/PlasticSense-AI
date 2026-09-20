@@ -40,3 +40,6 @@ class DetectionResponseDTO:
     created_at: datetime
     processing_time_ms: Optional[int]
     summary: Optional[dict]
+    segmentation: Optional[dict] = None
+    features: Optional[dict] = None
+    risk: Optional[dict] = None

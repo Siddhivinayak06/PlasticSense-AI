@@ -33,6 +33,10 @@ class DetectionSchema(BaseModel):
     created_at: datetime
     processing_time_ms: Optional[int] = None
     summary: Optional[dict] = None
+    segmentation: Optional[dict] = None
+    features: Optional[dict] = None
+    risk: Optional[dict] = None
+
 
 class BatchDetectResponseSchema(BaseModel):
     results: List[DetectionSchema]
@@ -59,4 +63,3 @@ class PaginatedDetectionEnvelope(EnvelopeResponse):
 
 class MapDetectionEnvelope(BaseModel):
     detections: List[DetectionSchema]
-

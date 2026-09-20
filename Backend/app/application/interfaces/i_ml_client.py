@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from app.domain.entities.detection import DetectionItem
 
@@ -15,6 +15,9 @@ class MLPrediction:
     items: List[DetectionItem]
     annotated_image_bytes: Optional[bytes] = None
     processing_time_ms: Optional[int] = None
+    segmentation: Optional[Any] = None
+    detector: Optional[Any] = None
+    combined_visualization_bytes: Optional[bytes] = None
 
 
 class IMLClient(ABC):

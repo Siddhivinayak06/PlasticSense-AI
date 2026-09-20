@@ -72,7 +72,7 @@ export function RecentReportsTable() {
             data?.data.map((detection) => {
               // Calculate most prominent waste group or total count
               const objectCount = detection.items.length;
-              
+
               return (
                 <TableRow key={detection.id} className="group cursor-pointer hover:bg-muted/30" onClick={() => router.push(`/history/${detection.id}`)}>
                   <TableCell className="font-mono text-xs font-medium">
@@ -97,11 +97,11 @@ export function RecentReportsTable() {
                     {/* Render top 2 categories */}
                     <div className="flex gap-1 flex-wrap">
                       {detection.summary && Object.entries(detection.summary)
-                        .filter(([k]) => k !== 'total_objects')
+                        .filter(([k, v]) => !['total_objects', 'waste_coverage_percent', 'risk_score', 'severity', 'cleanup_priority', 'explanation', 'material_coverage', 'material_counts'].includes(k) && typeof v === 'number')
                         .slice(0, 2)
                         .map(([group, count]) => (
                           <span key={group} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border bg-muted/40 uppercase">
-                            {group} <span className="ml-1 opacity-70">({count})</span>
+                            {group} <span className="ml-1 opacity-70">({count as number})</span>
                           </span>
                       ))}
                     </div>
@@ -109,7 +109,7 @@ export function RecentReportsTable() {
                   <TableCell className="hidden md:table-cell">
                     <div className="flex items-center text-xs text-muted-foreground gap-1 mt-1">
                       <MapPin className="size-3" />
-                      {detection.latitude !== null && detection.longitude !== null 
+                      {detection.latitude !== null && detection.longitude !== null
                         ? `${detection.latitude.toFixed(4)}, ${detection.longitude.toFixed(4)}`
                         : 'Unknown Location'}
                     </div>

@@ -12,8 +12,15 @@ def get_risk_assessment(detection_id: str, service: RiskService = Depends(get_ri
     assessment = service.get_for_detection(detection_id)
     if not assessment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Risk assessment for detection '{detection_id}' not found")
+    breakdown = assessment.strategy_breakdown or {}
     return SingleRiskEnvelope(data=RiskAssessmentSchema(
-        id=assessment.id, detection_id=assessment.detection_id, score=assessment.score,
-        level=assessment.level, strategy_breakdown=assessment.strategy_breakdown,
+        id=assessment.id,
+        detection_id=assessment.detection_id,
+        score=assessment.score,
+        level=assessment.level,
+        severity=breakdown.get("severity", assessment.level.upper()),
+        cleanup_priority=breakdown.get("cleanup_priority", "LOW"),
+        explanation=breakdown.get("explanation", ""),
+        strategy_breakdown=breakdown,
         computed_at=assessment.computed_at,
     ), meta=None, error=None)

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { submitDetection, fetchRiskAssessment, resolveImageUrl } from '@/services/detection';
-import type { Detection, RiskAssessment } from '@/types/detection';
+import type { Detection, DetectionItem, RiskAssessment } from '@/types/detection';
 import exifr from 'exifr';
 import { cn } from '@/lib/utils';
 import { ImageComparison } from '@/components/shared/ImageComparison';
@@ -143,6 +143,11 @@ function DetectionResults({
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
   const riskCfg = risk ? RISK_CONFIG[risk.level] : null;
+  const wasteCoverage = detection.segmentation?.waste_coverage_percent ?? (typeof detection.summary?.waste_coverage_percent === 'number' ? detection.summary.waste_coverage_percent : null);
+  const materialCoverage = detection.segmentation?.material_coverage ?? (typeof detection.summary?.material_coverage === 'object' ? detection.summary.material_coverage : null);
+  const materialCounts = detection.segmentation?.material_counts ?? (typeof detection.summary?.material_counts === 'object' ? detection.summary.material_counts : null);
+
+  const nonGroupKeys = new Set(['total_objects', 'waste_coverage_percent', 'material_coverage', 'material_counts', 'risk_score', 'severity', 'cleanup_priority', 'explanation']);
 
   return (
     <motion.div
@@ -158,22 +163,47 @@ function DetectionResults({
           <div>
             <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Detection Complete</p>
             <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{detection.items.length}</span> waste object{detection.items.length !== 1 ? 's' : ''} detected
+              <span className="font-medium text-foreground">{detection.items.length}</span> fine-grained object{detection.items.length !== 1 ? 's' : ''} detected
+              {wasteCoverage !== null && (
+                <> · <span className="font-medium text-foreground">{wasteCoverage}%</span> scene waste coverage</>
+              )}
             </p>
           </div>
         </div>
         <div className="text-right">
           <span className="text-xs font-mono text-muted-foreground">
-            {detection.model_version} • {detection.processing_time_ms || 0} ms
+            {detection.model_version.split('(')[0].trim()} • {detection.processing_time_ms || 0} ms
           </span>
         </div>
       </div>
 
+      {/* Coverage & Priority KPI Badges */}
+      {wasteCoverage !== null && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-primary/10 border border-primary/20">
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold">Waste Coverage</p>
+              <p className="text-lg font-bold text-primary mt-0.5">{wasteCoverage}%</p>
+            </div>
+            <Layers className="size-5 text-primary opacity-80" />
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/50">
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold">Priority Level</p>
+              <p className="text-lg font-bold capitalize text-foreground mt-0.5">
+                {risk?.cleanup_priority || detection.summary?.cleanup_priority || risk?.level || 'Standard'}
+              </p>
+            </div>
+            <ShieldAlert className="size-5 text-primary opacity-80" />
+          </div>
+        </div>
+      )}
+
       {/* Detected image comparison */}
       <div className="py-2">
-        <ImageComparison 
-          originalImage={imageUrl} 
-          annotatedImage={resolveImageUrl(detection.annotated_image_url) || imageUrl} 
+        <ImageComparison
+          originalImage={imageUrl}
+          annotatedImage={resolveImageUrl(detection.annotated_image_url) || imageUrl}
           items={detection.items}
           hoveredItemId={hoveredItemId}
           onItemHover={setHoveredItemId}
@@ -181,7 +211,7 @@ function DetectionResults({
       </div>
 
       {/* Detected objects & Waste Summary */}
-      {detection.items.length > 0 ? (
+      {(detection.items.length > 0 || (wasteCoverage !== null && wasteCoverage > 0)) ? (
         <div className="glass rounded-2xl p-4 space-y-4">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
@@ -189,30 +219,57 @@ function DetectionResults({
               <h3 className="text-sm font-semibold text-foreground">Waste Summary</h3>
             </div>
           </div>
-          
+
           <div className="pt-2">
-            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Waste Composition</h4>
+            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+              {materialCoverage && Object.keys(materialCoverage).length > 0 ? 'Material Composition (Coverage %)' : 'Waste Composition'}
+            </h4>
             <div className="space-y-2.5">
-              {detection.summary && Object.entries(detection.summary)
-                .filter(([k]) => k !== 'total_objects')
-                .sort(([, a], [, b]) => b - a)
-                .map(([group, count]) => {
-                  const percentage = Math.round((count / detection.items.length) * 100);
-                  return (
-                    <div key={group} className="flex items-center gap-3">
-                      <div className="w-24 truncate text-[11px] font-medium text-foreground">{group}</div>
-                      <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-primary rounded-full transition-all duration-1000" 
-                          style={{ width: `${percentage}%` }} 
-                        />
+              {materialCoverage && Object.keys(materialCoverage).length > 0 ? (
+                Object.entries(materialCoverage)
+                  .sort(([, a], [, b]) => Number(b) - Number(a))
+                  .map(([material, cov]) => {
+                    const count = materialCounts?.[material] ?? 0;
+                    return (
+                      <div key={material} className="flex items-center gap-3">
+                        <div className="w-24 truncate text-[11px] font-medium text-foreground capitalize">
+                          {material} {count > 0 && <span className="opacity-60 text-[10px]">({count})</span>}
+                        </div>
+                        <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all duration-1000"
+                            style={{ width: `${Math.min(100, Math.max(5, (Number(cov) / (wasteCoverage || 1)) * 100))}%` }}
+                          />
+                        </div>
+                        <div className="w-14 text-right text-[11px] font-semibold text-muted-foreground">{Number(cov).toFixed(2)}%</div>
                       </div>
-                      <div className="w-12 text-right text-[11px] font-semibold text-muted-foreground">{percentage}%</div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+              ) : (
+                detection.summary && Object.entries(detection.summary)
+                  .filter(([k, v]) => !nonGroupKeys.has(k) && typeof v === 'number')
+                  .sort(([, a], [, b]) => (b as number) - (a as number))
+                  .map(([group, count]) => {
+                    const numCount = count as number;
+                    const total = detection.items.length > 0 ? detection.items.length : 1;
+                    const percentage = Math.round((numCount / total) * 100);
+                    return (
+                      <div key={group} className="flex items-center gap-3">
+                        <div className="w-24 truncate text-[11px] font-medium text-foreground capitalize">{group}</div>
+                        <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all duration-1000"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                        <div className="w-12 text-right text-[11px] font-semibold text-muted-foreground">{percentage}%</div>
+                      </div>
+                    );
+                  })
+              )}
             </div>
           </div>
+
 
           <div className="pt-2">
             <div className="flex items-center justify-between mb-3">
@@ -222,7 +279,7 @@ function DetectionResults({
               </div>
               <span className="text-[10px] text-muted-foreground">{detection.items.length} total</span>
             </div>
-            
+
             {/* Grouped item list */}
             <div className="flex flex-col gap-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
               {Object.entries(
@@ -248,7 +305,7 @@ function DetectionResults({
                 const avgConfidence = data.items.reduce((sum, i) => sum + i.confidence, 0) / data.count;
 
                 return (
-                  <div 
+                  <div
                     key={className}
                     className={`flex items-center justify-between rounded-lg border p-2.5 transition-colors ${groupClass} ${hoveredItemId === className ? 'border-primary shadow-sm' : ''}`}
                     onMouseEnter={() => setHoveredItemId(className)}
@@ -374,7 +431,7 @@ export default function DetectPage() {
     setRisk(null);
     setErrorMsg('');
     setExifStatus('loading');
-    
+
     try {
       const gps = await exifr.gps(f);
       if (gps && typeof gps.latitude === 'number' && typeof gps.longitude === 'number') {
@@ -431,7 +488,7 @@ export default function DetectPage() {
 
     const lat = latitude ? parseFloat(latitude) : null;
     const lng = longitude ? parseFloat(longitude) : null;
-    
+
     if ((lat !== null && isNaN(lat)) || (lng !== null && isNaN(lng))) {
       setErrorMsg('Please enter valid GPS coordinates or leave them empty.');
       return;
@@ -454,7 +511,9 @@ export default function DetectPage() {
       const det = await submitDetection(file, lat, lng);
       setDetection(det);
 
-      if (det.detection_status === 'completed' && det.items.length > 0) {
+      if (det.risk) {
+        setRisk(det.risk as any);
+      } else if (det.detection_status === 'completed') {
         try {
           const riskEnvelope = await fetchRiskAssessment(det.id);
           setRisk(riskEnvelope.data);
@@ -463,6 +522,7 @@ export default function DetectPage() {
         }
       }
       setState('done');
+
     } catch (err: any) {
       let msg = 'Detection failed. Make sure the backend is running on port 8000.';
       if (err?.response?.data?.detail) {
@@ -505,7 +565,7 @@ export default function DetectPage() {
             Upload a geotagged image to detect and classify waste using AI.
           </p>
         </div>
-        
+
         {/* System Status */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 shrink-0">
           <div className="relative flex size-2">

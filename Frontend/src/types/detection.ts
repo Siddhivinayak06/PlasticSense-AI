@@ -13,6 +13,12 @@ export interface DetectionItem {
 
 // ─── Detection Response ──────────────────────────────────────────
 
+export interface SegmentationInfo {
+  waste_coverage_percent: number;
+  material_coverage: Record<string, number>;
+  material_counts: Record<string, number>;
+}
+
 export interface Detection {
   id: string;
   image_url: string;
@@ -27,7 +33,10 @@ export interface Detection {
   items: DetectionItem[];
   created_at: string;
   processing_time_ms: number | null;
-  summary: Record<string, number> | null;
+  summary: Record<string, any> | null;
+  segmentation?: SegmentationInfo | null;
+  features?: Record<string, any> | null;
+  risk?: Record<string, any> | null;
 }
 
 // ─── API Envelope ────────────────────────────────────────────────
@@ -45,10 +54,21 @@ export interface MapDetectionEnvelope {
 // ─── Risk Assessment ─────────────────────────────────────────────
 
 export interface RiskBreakdown {
-  object_count: number;
-  density: number;
-  hazard: number;
-  waterbody: number;
+  coverage?: number;
+  density?: number;
+  composition?: number;
+  hazard?: number;
+  object_count?: number;
+  waste_coverage_percent?: number;
+  material_coverage?: Record<string, number>;
+  material_counts?: Record<string, number>;
+  material_proportions?: Record<string, number>;
+  hazard_indicators?: Record<string, any>;
+  explanation?: string;
+  severity?: string;
+  cleanup_priority?: string;
+  waterbody?: number;
+  [key: string]: any;
 }
 
 export interface RiskAssessment {
@@ -56,6 +76,9 @@ export interface RiskAssessment {
   detection_id: string;
   score: number;
   level: 'low' | 'medium' | 'high' | 'critical';
+  severity?: string;
+  cleanup_priority?: string;
+  explanation?: string;
   strategy_breakdown: RiskBreakdown;
   computed_at: string;
 }

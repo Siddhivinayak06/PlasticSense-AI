@@ -21,6 +21,7 @@ class DetectionRepository(IDetectionRepository):
                 bbox_y=item.bbox_y,
                 bbox_w=item.bbox_w,
                 bbox_h=item.bbox_h,
+                waste_type=item.waste_type,
             )
             for item in model.items
         ]
@@ -54,8 +55,13 @@ class DetectionRepository(IDetectionRepository):
             failure_reason=detection.failure_reason,
             created_at=detection.created_at,
         )
-        
+
         for item in detection.items:
+            waste_type_val = (
+                item.waste_type.value if hasattr(getattr(item, "waste_type", None), "value")
+                else str(item.waste_type) if getattr(item, "waste_type", None)
+                else item.class_name or "unknown"
+            )
             item_model = DetectionItemModel(
                 id=item.id,
                 detection_id=model.id,
@@ -66,6 +72,7 @@ class DetectionRepository(IDetectionRepository):
                 bbox_y=item.bbox_y,
                 bbox_w=item.bbox_w,
                 bbox_h=item.bbox_h,
+                waste_type=waste_type_val,
             )
             model.items.append(item_model)
 
@@ -86,6 +93,11 @@ class DetectionRepository(IDetectionRepository):
         model.processing_time_ms = detection.processing_time_ms
         model.items.clear()
         for item in detection.items:
+            waste_type_val = (
+                item.waste_type.value if hasattr(getattr(item, "waste_type", None), "value")
+                else str(item.waste_type) if getattr(item, "waste_type", None)
+                else item.class_name or "unknown"
+            )
             model.items.append(DetectionItemModel(
                 id=item.id,
                 detection_id=model.id,
@@ -96,6 +108,7 @@ class DetectionRepository(IDetectionRepository):
                 bbox_y=item.bbox_y,
                 bbox_w=item.bbox_w,
                 bbox_h=item.bbox_h,
+                waste_type=waste_type_val,
             ))
         self.db.commit()
         self.db.refresh(model)

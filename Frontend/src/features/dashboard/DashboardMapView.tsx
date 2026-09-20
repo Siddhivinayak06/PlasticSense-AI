@@ -1,11 +1,14 @@
 'use client';
 
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchMapDetections } from '@/services/detection';
 
 interface MapHotspot {
   id: string;
@@ -17,6 +20,8 @@ interface MapHotspot {
   wasteObjects: number;
   reports: number;
   cleanupStatus: string;
+  detailUrl?: string;
+  explanation?: string;
 }
 
 const SEVERITY_COLORS = {
@@ -37,38 +42,85 @@ const mapHotspots: MapHotspot[] = [
   { id: 'h8', name: 'Mangalore Shore', lat: 12.914, lng: 74.856, severity: 'low', severityScore: 32, wasteObjects: 34, reports: 5, cleanupStatus: 'Verified' },
 ];
 
+function MapRecenter({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [center[0], center[1], zoom, map]);
+  return null;
+}
+
 export function DashboardMapView() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
-  const tileUrl = isDark 
+  const tileUrl = isDark
     ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
     : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 
+  const { data } = useQuery({
+    queryKey: ['mapDetections'],
+    queryFn: fetchMapDetections,
+  });
+
+  const realHotspots: MapHotspot[] = (data?.detections || [])
+    .filter((d) => d.latitude != null && d.longitude != null)
+    .map((d) => {
+      const rawLevel = (d.risk?.level || d.risk?.severity?.toLowerCase() || 'medium') as string;
+      const severity: 'low' | 'medium' | 'high' | 'critical' =
+        ['low', 'medium', 'high', 'critical'].includes(rawLevel) ? (rawLevel as any) : 'medium';
+      const score = Math.round(d.risk?.score ?? 50);
+      const wasteCount = d.items?.length ?? 0;
+      const coverage = d.segmentation?.waste_coverage_percent ?? d.summary?.waste_coverage_percent;
+      const cleanupStatus = d.risk?.cleanup_priority ?? 'Pending';
+      const locationName = `Report #${d.id.slice(0, 8)}${coverage != null ? ` (${coverage}% cover)` : ''}`;
+
+      return {
+        id: d.id,
+        name: locationName,
+        lat: d.latitude!,
+        lng: d.longitude!,
+        severity,
+        severityScore: score,
+        wasteObjects: wasteCount,
+        reports: 1,
+        cleanupStatus,
+        detailUrl: `/history/${d.id}`,
+        explanation: d.risk?.explanation,
+      };
+    });
+
+  const hotspots = realHotspots.length > 0 ? realHotspots : mapHotspots;
+  const activeCenter: [number, number] = realHotspots.length > 0
+    ? [realHotspots[0].lat, realHotspots[0].lng]
+    : [16.5, 79.0];
+  const activeZoom = realHotspots.length > 0 ? 9 : 5;
+
   return (
     <MapContainer
-      center={[16.5, 79.0]}
-      zoom={5}
+      center={activeCenter}
+      zoom={activeZoom}
       className="h-full w-full"
       zoomControl={false}
       attributionControl={false}
       style={{ background: isDark ? '#0f172a' : '#f8fafc' }}
     >
+      {realHotspots.length > 0 && <MapRecenter center={activeCenter} zoom={activeZoom} />}
       <TileLayer
         url={tileUrl}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
       />
 
-      {mapHotspots.map((hotspot) => (
+      {hotspots.map((hotspot) => (
         <CircleMarker
           key={hotspot.id}
           center={[hotspot.lat, hotspot.lng]}
-          radius={Math.max(8, hotspot.wasteObjects / 20)}
+          radius={Math.max(8, hotspot.wasteObjects * 2 || 8)}
           pathOptions={{
             fillColor: SEVERITY_COLORS[hotspot.severity],
             color: SEVERITY_COLORS[hotspot.severity],
             weight: 2,
             opacity: 0.8,
-            fillOpacity: 0.4,
+            fillOpacity: 0.5,
           }}
         >
           <Popup className="!rounded-xl" maxWidth={280}>
@@ -77,6 +129,11 @@ export function DashboardMapView() {
                 <h3 className="font-semibold text-sm">{hotspot.name}</h3>
                 <SeverityBadge severity={hotspot.severity} size="sm" />
               </div>
+              {hotspot.explanation && (
+                <p className="text-[11px] text-muted-foreground line-clamp-2 italic">
+                  {hotspot.explanation}
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 <div>
                   <span className="text-muted-foreground">Score</span>
@@ -96,7 +153,7 @@ export function DashboardMapView() {
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
-                <Link href="/hotspots" className="flex-1">
+                <Link href={hotspot.detailUrl ?? '/hotspots'} className="flex-1">
                   <Button variant="outline" size="xs" className="w-full text-[11px]">View Hotspot</Button>
                 </Link>
                 <Link href="/assignments" className="flex-1">

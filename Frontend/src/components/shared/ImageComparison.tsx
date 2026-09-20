@@ -15,15 +15,15 @@ interface ImageComparisonProps {
   onItemHover?: (id: string | null) => void;
 }
 
-export function ImageComparison({ 
-  originalImage, 
-  annotatedImage, 
-  items = [], 
-  hoveredItemId, 
-  onItemHover 
+export function ImageComparison({
+  originalImage,
+  annotatedImage,
+  items = [],
+  hoveredItemId,
+  onItemHover
 }: ImageComparisonProps) {
   const [zoomedImg, setZoomedImg] = useState<string | null>(null);
-  
+
   // Controls state
   const [showLabels, setShowLabels] = useState(true);
   const [filterCategory, setFilterCategory] = useState('all');
@@ -49,7 +49,7 @@ export function ImageComparison({
               <ImageIcon className="size-4 text-primary" />
               <h3 className="text-sm font-semibold text-foreground">Original Image</h3>
             </div>
-            <div 
+            <div
               className="group rounded-2xl overflow-hidden border border-border/50 shadow bg-muted/20 relative aspect-video flex items-center justify-center cursor-zoom-in"
               onClick={() => setZoomedImg(originalImage)}
             >
@@ -79,8 +79,8 @@ export function ImageComparison({
                   onDownload={handleDownload}
                 />
               )}
-              
-              <div 
+
+              <div
                 className="relative aspect-video flex items-center justify-center group"
                 onClick={() => {
                   if (items.length === 0 && annotatedImage) setZoomedImg(annotatedImage);
@@ -89,7 +89,7 @@ export function ImageComparison({
               >
                 {items.length > 0 ? (
                   <BoundingBoxOverlay
-                    imageUrl={originalImage}
+                    imageUrl={annotatedImage || originalImage}
                     items={items}
                     showLabels={showLabels}
                     filterCategory={filterCategory}
@@ -124,13 +124,13 @@ export function ImageComparison({
             <button className="absolute top-6 right-6 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-[110]">
               <X className="size-6" />
             </button>
-            <div 
+            <div
               className="relative max-h-[90vh] max-w-[90vw] w-full h-full flex items-center justify-center"
-              onClick={(e) => e.stopPropagation()} 
+              onClick={(e) => e.stopPropagation()}
             >
               {zoomedImg === 'interactive' ? (
                 <BoundingBoxOverlay
-                  imageUrl={originalImage}
+                  imageUrl={annotatedImage || originalImage}
                   items={items}
                   showLabels={showLabels}
                   filterCategory={filterCategory}

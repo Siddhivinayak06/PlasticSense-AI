@@ -5,8 +5,11 @@ import { AlertTriangle, MapPin, Users, ChevronRight, Flame } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { useQuery } from '@tanstack/react-query';
+import { fetchHotspots } from '@/services/hotspots';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
 
 interface UrgentHotspot {
   id: string;
@@ -22,63 +25,30 @@ interface UrgentHotspot {
   recommendedTeamSize: string;
 }
 
-const urgentHotspots: UrgentHotspot[] = [
-  {
-    id: 'HS-2026-001',
-    name: 'Juhu Beach Shoreline',
-    city: 'Mumbai',
-    severityScore: 94,
-    severity: 'critical',
-    wasteCount: 238,
-    dominantWaste: 'PET Bottles',
-    lastDetected: '2 hours ago',
-    reportCount: 32,
-    cleanupStatus: 'pending',
-    recommendedTeamSize: '8–12',
-  },
-  {
-    id: 'HS-2026-002',
-    name: 'Marina Beach Road',
-    city: 'Chennai',
-    severityScore: 87,
-    severity: 'critical',
-    wasteCount: 184,
-    dominantWaste: 'Plastic Bags',
-    lastDetected: '5 hours ago',
-    reportCount: 24,
-    cleanupStatus: 'assigned',
-    recommendedTeamSize: '6–10',
-  },
-  {
-    id: 'HS-2026-003',
-    name: 'Versova Seafront',
-    city: 'Mumbai',
-    severityScore: 81,
-    severity: 'high',
-    wasteCount: 156,
-    dominantWaste: 'Food Packaging',
-    lastDetected: '8 hours ago',
-    reportCount: 18,
-    cleanupStatus: 'in-progress',
-    recommendedTeamSize: '5–8',
-  },
-  {
-    id: 'HS-2026-004',
-    name: 'Baga Beach Strip',
-    city: 'Goa',
-    severityScore: 76,
-    severity: 'high',
-    wasteCount: 128,
-    dominantWaste: 'Plastic Films',
-    lastDetected: '12 hours ago',
-    reportCount: 14,
-    cleanupStatus: 'pending',
-    recommendedTeamSize: '4–6',
-  },
-];
-
 export function UrgentActions() {
-  if (urgentHotspots.length === 0) return null;
+  const { data } = useQuery({
+    queryKey: ['hotspots'],
+    queryFn: fetchHotspots,
+  });
+
+  const hotspots: UrgentHotspot[] = useMemo(() => {
+    if (!data?.hotspots || data.hotspots.length === 0) return [];
+    return data.hotspots.map((h) => ({
+      id: h.id,
+      name: h.name,
+      city: `Lat ${h.latitude.toFixed(3)}, Lng ${h.longitude.toFixed(3)}`,
+      severityScore: Math.round(h.max_risk_score),
+      severity: h.severity,
+      wasteCount: h.total_waste_objects,
+      dominantWaste: `${h.most_common_material} Debris`,
+      lastDetected: 'Monitored',
+      reportCount: h.report_count,
+      cleanupStatus: h.status,
+      recommendedTeamSize: `${Math.min(15, Math.max(3, Math.round(h.total_waste_objects / 2) + 2))} Members`,
+    })).sort((a, b) => b.severityScore - a.severityScore).slice(0, 4);
+  }, [data]);
+
+  if (hotspots.length === 0) return null;
 
   return (
     <motion.div
@@ -88,100 +58,95 @@ export function UrgentActions() {
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-red-500/10">
-            <AlertTriangle className="size-4 text-red-500" />
+          <div className="flex size-7 items-center justify-center rounded-lg bg-red-500/10 dark:bg-red-500/20">
+            <Flame className="size-4 text-red-600 dark:text-red-400" />
           </div>
           <div>
             <h2 className="text-base font-semibold text-foreground">Urgent Action Required</h2>
-            <p className="text-xs text-muted-foreground">Highest-priority pollution locations requiring immediate attention</p>
+            <p className="text-xs text-muted-foreground">High-risk pollution zones prioritized by dual-model analysis</p>
           </div>
         </div>
         <Link href="/hotspots">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">
             View all hotspots
             <ChevronRight className="size-3.5" />
           </Button>
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {urgentHotspots.map((hotspot, index) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {hotspots.map((hotspot, index) => (
           <motion.div
             key={hotspot.id}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 + index * 0.06 }}
+            transition={{ duration: 0.3, delay: index * 0.05 }}
             className={cn(
-              'glass rounded-2xl p-4 space-y-3 transition-shadow hover:shadow-lg',
-              hotspot.severity === 'critical' && 'pulse-urgent',
+              'glass rounded-2xl p-4 flex flex-col justify-between space-y-3 relative overflow-hidden group',
+              'hover:shadow-md transition-shadow',
+              hotspot.severity === 'critical' && 'border-l-4 border-l-red-500',
+              hotspot.severity === 'high' && 'border-l-4 border-l-orange-500',
+              hotspot.severity === 'medium' && 'border-l-4 border-l-amber-500',
+              hotspot.severity === 'low' && 'border-l-4 border-l-emerald-500',
             )}
           >
-            {/* Header */}
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">{hotspot.name}</p>
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
-                  <MapPin className="size-3 shrink-0" />
-                  <span>{hotspot.city}</span>
+            {/* Header: Name + Badges */}
+            <div>
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                    {hotspot.name}
+                  </h3>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                    <MapPin className="size-3 shrink-0" />
+                    <span className="truncate">{hotspot.city}</span>
+                  </div>
                 </div>
+                <SeverityBadge severity={hotspot.severity} size="sm" />
               </div>
-              <SeverityBadge severity={hotspot.severity} size="sm" />
             </div>
 
-            {/* Score */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <Flame className={cn(
-                  'size-4',
-                  hotspot.severity === 'critical' ? 'text-red-500' : 'text-orange-500',
-                )} />
-                <span className={cn(
-                  'text-lg font-bold',
-                  hotspot.severity === 'critical' ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400',
-                )}>
-                  {hotspot.severityScore}
+            {/* Metrics */}
+            <div className="grid grid-cols-2 gap-2 py-1 text-xs">
+              <div className="rounded-lg bg-muted/40 p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase font-medium">Risk Score</p>
+                <p className="font-bold text-foreground text-sm mt-0.5">{hotspot.severityScore}/100</p>
+              </div>
+              <div className="rounded-lg bg-muted/40 p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase font-medium">Waste Objects</p>
+                <p className="font-bold text-foreground text-sm mt-0.5">{hotspot.wasteCount}</p>
+              </div>
+            </div>
+
+            {/* Details */}
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>Material:</span>
+                <span className="font-medium text-foreground">{hotspot.dominantWaste}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Reports:</span>
+                <span className="font-medium text-foreground">{hotspot.reportCount} sightings</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Users className="size-3" />
+                  Recommended Crew:
                 </span>
-                <span className="text-xs text-muted-foreground">/100</span>
-              </div>
-              <StatusBadge status={hotspot.cleanupStatus} size="sm" />
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-muted-foreground">Waste Objects</span>
-                <p className="font-semibold text-foreground">{hotspot.wasteCount}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Reports</span>
-                <p className="font-semibold text-foreground">{hotspot.reportCount}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Dominant Waste</span>
-                <p className="font-semibold text-foreground truncate">{hotspot.dominantWaste}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Team Size</span>
-                <div className="flex items-center gap-1">
-                  <Users className="size-3 text-muted-foreground" />
-                  <span className="font-semibold text-foreground">{hotspot.recommendedTeamSize}</span>
-                </div>
+                <span className="font-medium text-foreground">{hotspot.recommendedTeamSize}</span>
               </div>
             </div>
 
-            {/* Last detected */}
-            <p className="text-[10px] text-muted-foreground/70">Last detected: {hotspot.lastDetected}</p>
-
-            {/* Actions */}
-            <div className="flex gap-2 pt-1">
-              <Link href="/hotspots" className="flex-1">
-                <Button variant="outline" size="xs" className="w-full text-xs">
-                  View
+            {/* Action */}
+            <div className="pt-1 flex gap-2">
+              <Link href={`/assignments?hotspot_id=${hotspot.id}`} className="flex-1">
+                <Button variant="default" size="xs" className="w-full text-xs h-7">
+                  Deploy Team
                 </Button>
               </Link>
-              <Link href="/assignments" className="flex-1">
-                <Button variant="default" size="xs" className="w-full text-xs">
-                  Assign
+              <Link href="/hotspots">
+                <Button variant="outline" size="xs" className="text-xs h-7 px-2">
+                  Inspect
                 </Button>
               </Link>
             </div>

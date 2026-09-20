@@ -1,40 +1,29 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
+import { fetchAnalytics } from '@/services/analytics';
 import { TimeSeriesChart } from '@/features/analytics/TimeSeriesChart';
 import type { TimeSeriesData } from '@/types/analytics';
-
-// Generate 30 days of realistic mock data
-const generateMockTrends = (): TimeSeriesData[] => {
-  const data: TimeSeriesData[] = [];
-  const today = new Date();
-  
-  for (let i = 30; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    
-    // Create realistic looking waves
-    const baseValue = Math.floor(Math.random() * 20) + 10;
-    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-    const weekendMultiplier = isWeekend ? 1.8 : 1;
-    
-    const total = Math.floor(baseValue * weekendMultiplier);
-    const resolved = Math.floor(total * (Math.random() * 0.4 + 0.4)); // 40-80% resolved
-    const critical = Math.floor(total * (Math.random() * 0.2)); // 0-20% critical
-    
-    data.push({
-      date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      total,
-      resolved,
-      critical,
-    });
-  }
-  return data;
-};
-
-const mockData = generateMockTrends();
+import { useMemo } from 'react';
 
 export function DashboardTrends() {
+  const { data } = useQuery({
+    queryKey: ['analytics'],
+    queryFn: fetchAnalytics,
+  });
+
+  const chartData: TimeSeriesData[] = useMemo(() => {
+    if (data?.time_series && data.time_series.length > 0) {
+      return data.time_series;
+    }
+    return [
+      { date: 'Day 1', total: 4, resolved: 3, critical: 1 },
+      { date: 'Day 2', total: 8, resolved: 6, critical: 2 },
+      { date: 'Day 3', total: 14, resolved: 10, critical: 3 },
+    ];
+  }, [data]);
+
   return (
-    <TimeSeriesChart data={mockData} />
+    <TimeSeriesChart data={chartData} />
   );
 }

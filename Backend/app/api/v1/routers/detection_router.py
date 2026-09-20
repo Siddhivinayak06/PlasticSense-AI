@@ -39,6 +39,7 @@ def _to_detection_schema(dto) -> DetectionSchema:
         latitude=dto.latitude,
         longitude=dto.longitude,
         location_source=dto.location_source,
+        location_confidence=dto.location_confidence,
         model_version=dto.model_version,
         detection_status=dto.detection_status,
         failure_reason=dto.failure_reason,
@@ -46,6 +47,9 @@ def _to_detection_schema(dto) -> DetectionSchema:
         created_at=dto.created_at,
         processing_time_ms=dto.processing_time_ms,
         summary=dto.summary,
+        segmentation=dto.segmentation,
+        features=dto.features,
+        risk=dto.risk,
     )
 
 
@@ -53,7 +57,13 @@ def _to_detection_schema(dto) -> DetectionSchema:
     "/detect",
     response_model=DetectionSchema,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload image & create detection record",
+    summary="Upload image & run dual-model waste detection/segmentation/risk analysis",
+)
+@router.post(
+    "/analyze",
+    response_model=DetectionSchema,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload image & run comprehensive waste analysis (alias for /detect)",
 )
 async def create_detection(
     latitude: Optional[float] = Form(None, description="Latitude coordinate (-90 to 90)"),
@@ -83,6 +93,7 @@ async def create_detection(
         logger.error(f"Unexpected error in create_detection: {err}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(err))
 
+
 @router.post(
     "/detect/batch",
     response_model=BatchDetectResponseSchema,
@@ -111,7 +122,7 @@ async def create_batch_detection(
         except Exception as e:
             logger.error(f"Failed to process {upload_file.filename} in batch: {e}")
             continue
-            
+
     return BatchDetectResponseSchema(results=results)
 
 
@@ -137,6 +148,34 @@ async def list_detections(
     return PaginatedDetectionEnvelope(data=schema_items, meta=meta, error=None)
 
 
+from collections import defaultdict
+from pydantic import BaseModel
+
+
+class HotspotItemSchema(BaseModel):
+    id: str
+    name: str
+    latitude: float
+    longitude: float
+    radius: float
+    report_count: int
+    total_waste_objects: int
+    avg_risk_score: float
+    max_risk_score: float
+    severity: str
+    priority: str
+    dominant_materials: list[str]
+    most_common_material: str
+    status: str
+    last_updated: str
+    detection_ids: list[str]
+
+
+class HotspotsEnvelope(BaseModel):
+    hotspots: list[HotspotItemSchema]
+    total_hotspots: int
+
+
 @router.get(
     "/map",
     response_model=MapDetectionEnvelope,
@@ -148,6 +187,110 @@ async def get_map_detections(
     items = service.list_map_detections()
     schema_items = [_to_detection_schema(item) for item in items]
     return MapDetectionEnvelope(detections=schema_items)
+
+
+@router.get(
+    "/hotspots",
+    response_model=HotspotsEnvelope,
+    summary="Get dynamically clustered pollution hotspots from real detections",
+)
+async def get_hotspots(
+    service: DetectionService = Depends(get_detection_service),
+):
+    items = service.list_map_detections()
+    if not items:
+        return HotspotsEnvelope(hotspots=[], total_hotspots=0)
+
+    # Spatial clustering (group within ~0.025 degrees ≈ 2.5 km)
+    clusters = []
+    for item in items:
+        if item.latitude is None or item.longitude is None:
+            continue
+        lat, lng = item.latitude, item.longitude
+        placed = False
+        for cl in clusters:
+            cl_lat = sum(d.latitude for d in cl) / len(cl)
+            cl_lng = sum(d.longitude for d in cl) / len(cl)
+            dist = math.hypot(lat - cl_lat, lng - cl_lng)
+            if dist <= 0.025:
+                cl.append(item)
+                placed = True
+                break
+        if not placed:
+            clusters.append([item])
+
+    hotspot_list = []
+    for idx, cl in enumerate(clusters):
+        c_lat = sum(d.latitude for d in cl) / len(cl)
+        c_lng = sum(d.longitude for d in cl) / len(cl)
+        waste_objects = sum(len(d.items) for d in cl)
+
+
+        # Risk scores
+        risk_scores = []
+        for d in cl:
+            score = None
+            if isinstance(d.risk, dict):
+                score = d.risk.get("score")
+            elif hasattr(d.risk, "score"):
+                score = d.risk.score
+            if score is not None:
+                try:
+                    risk_scores.append(float(score))
+                except (ValueError, TypeError):
+                    pass
+        avg_score = round(sum(risk_scores) / len(risk_scores), 1) if risk_scores else 50.0
+        max_score = round(max(risk_scores), 1) if risk_scores else 50.0
+
+
+        if max_score >= 75:
+            severity = "critical"
+            priority = "urgent"
+        elif max_score >= 50:
+            severity = "high"
+            priority = "high"
+        elif max_score >= 25:
+            severity = "medium"
+            priority = "medium"
+        else:
+            severity = "low"
+            priority = "low"
+
+        # Materials
+        mat_counts = defaultdict(int)
+        for d in cl:
+            for it in d.items:
+                if it.waste_group:
+                    mat_counts[it.waste_group.lower()] += 1
+        sorted_mats = sorted(mat_counts.items(), key=lambda x: x[1], reverse=True)
+        dominant_mats = [m[0].title() for m in sorted_mats[:3]] or ["Plastic"]
+        most_common = dominant_mats[0]
+
+        latest_dt = max(d.created_at for d in cl)
+        radius = min(1000.0, max(250.0, float(len(cl)) * 120.0))
+
+        hotspot_list.append(HotspotItemSchema(
+            id=f"HS-2026-{idx+1:02d}",
+            name=f"Zone Lat {c_lat:.3f}, Lng {c_lng:.3f}",
+            latitude=round(c_lat, 6),
+            longitude=round(c_lng, 6),
+            radius=radius,
+            report_count=len(cl),
+            total_waste_objects=waste_objects,
+            avg_risk_score=avg_score,
+            max_risk_score=max_score,
+            severity=severity,
+            priority=priority,
+            dominant_materials=dominant_mats,
+            most_common_material=most_common,
+            status="pending",
+            last_updated=latest_dt.isoformat() if hasattr(latest_dt, "isoformat") else str(latest_dt),
+            detection_ids=[d.id for d in cl],
+        ))
+
+    hotspot_list.sort(key=lambda h: h.max_risk_score, reverse=True)
+    return HotspotsEnvelope(hotspots=hotspot_list, total_hotspots=len(hotspot_list))
+
 
 @router.get(
     "/{detection_id}",
@@ -163,4 +306,3 @@ async def get_detection(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Detection '{detection_id}' not found")
     schema_data = _to_detection_schema(item)
     return SingleDetectionEnvelope(data=schema_data, meta=None, error=None)
-
