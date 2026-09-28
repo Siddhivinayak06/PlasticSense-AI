@@ -5,7 +5,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -31,13 +30,13 @@ export function ProfileMenu() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56" sideOffset={8}>
-        <DropdownMenuLabel className="flex flex-col gap-1 pb-2">
+        <div className="flex flex-col gap-1 pb-2 px-2 pt-1.5 border-b border-border/50 mb-1">
           <span className="text-sm font-semibold">Admin User</span>
           <span className="text-xs text-muted-foreground font-normal">admin@plasticsense.ai</span>
           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full w-fit mt-0.5">
             Administrator
           </span>
-        </DropdownMenuLabel>
+        </div>
         <DropdownMenuSeparator />
 
         <Link href="/settings">

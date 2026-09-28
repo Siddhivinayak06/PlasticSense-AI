@@ -1,7 +1,7 @@
 import { CleanupAssignment } from '@/types/assignment';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, FileText, Eye, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
@@ -77,7 +77,7 @@ export const CleanupTable = ({ assignments, compact = false }: CleanupTableProps
                       <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuLabel className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Actions</DropdownMenuLabel>
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground font-semibold uppercase tracking-wider border-b border-border/50 mb-1">Actions</div>
                       <DropdownMenuItem className="p-0">
                         <Link href={`/assignments/${assignment.id}`} className="cursor-pointer flex items-center w-full px-2 py-1.5 text-sm">
                           <Eye className="w-4 h-4 mr-2 text-primary" />

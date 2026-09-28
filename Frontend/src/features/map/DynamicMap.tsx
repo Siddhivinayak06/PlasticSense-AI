@@ -100,8 +100,8 @@ export default function DynamicMap({ reports, hotspots, overlays, onHotspotClick
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const tileUrl = isDark 
-    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+    ? 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   const renderMarkers = () => {
     return reports.map(r => (
@@ -124,7 +124,10 @@ export default function DynamicMap({ reports, hotspots, overlays, onHotspotClick
         
         {/* Base Map */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          attribution={isDark
+            ? '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+            : '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+          }
           url={tileUrl}
         />
 

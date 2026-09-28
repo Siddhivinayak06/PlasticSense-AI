@@ -33,7 +33,7 @@ export function Sidebar() {
               exit={{ opacity: 0, width: 0 }}
               className="text-sm font-bold text-foreground whitespace-nowrap overflow-hidden"
             >
-              PlasticSense AI
+              WasteSense AI
             </motion.span>
           )}
         </Link>
