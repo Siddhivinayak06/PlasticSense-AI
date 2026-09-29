@@ -55,9 +55,7 @@ venv.bak/
 .ipynb_checkpoints
 
 # Datasets and ML Models
-*.pt
-!**/plasticsense_detector_best.pt
-!**/taco_segmentation_best.pt
+
 *.pth
 *.h5
 *.hdf5
