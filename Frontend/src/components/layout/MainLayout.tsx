@@ -1,11 +1,19 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
 import { MobileDrawer } from './MobileDrawer';
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  // Landing page gets NO layout chrome
+  if (pathname === '/') {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />

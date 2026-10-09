@@ -53,9 +53,8 @@ function MapRecenter({ center, zoom }: { center: [number, number]; zoom: number 
 export function DashboardMapView() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
-  const tileUrl = isDark
-    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+  // Use standard OSM to avoid API key watermarks
+  const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   const { data } = useQuery({
     queryKey: ['mapDetections'],
@@ -108,13 +107,19 @@ export function DashboardMapView() {
       <TileLayer
         url={tileUrl}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+        className={isDark ? 'dark-map-tiles' : ''}
       />
+      <style>{`
+        .dark-map-tiles {
+          filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+      `}</style>
 
       {hotspots.map((hotspot) => (
         <CircleMarker
           key={hotspot.id}
           center={[hotspot.lat, hotspot.lng]}
-          radius={Math.max(8, hotspot.wasteObjects * 2 || 8)}
+          radius={Math.max(8, Math.min(28, Math.sqrt(hotspot.wasteObjects) * 1.5))}
           pathOptions={{
             fillColor: SEVERITY_COLORS[hotspot.severity],
             color: SEVERITY_COLORS[hotspot.severity],

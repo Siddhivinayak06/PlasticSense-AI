@@ -347,12 +347,15 @@ Images are stored **locally** in the `media/` folder under the `Backend/` direct
 
 ---
 
-## ML Pipeline (YOLO Integration)
+## 🧠 ML Pipeline (YOLO Integration)
 
-The backend natively runs YOLO11 via the `ultralytics` package. `LocalYoloMLClient` handles inference and bounding box plotting directly in the `application` layer.
+Currently, the backend natively runs YOLO11 via the `ultralytics` package. `LocalYoloMLClient` handles inference and bounding box plotting directly via the infrastructure layer. 
 
-The client normalizes `[x1, y1, x2, y2]` into the persisted `bbox_x`, `bbox_y`, `bbox_w`, and `bbox_h` fields, while automatically mapping granular YOLO class names (like `PET_bottle`) into generic frontend categories (`plastic`, `metal`, `glass`) via `waste_mapping.json`.
+**Architectural Goal (Clean Architecture):** 
+While currently using a local client for simplicity, the application is strictly designed to decouple the ML inference. The `IMLClient` interface ensures that we can easily swap `LocalYoloMLClient` with a network-based `HttpYoloMLClient` that talks to the standalone `/ML-service` microservice, fulfilling the requirement that the core backend remains completely independent of ML heavy-lifting libraries.
+
+The client normalizes bounding boxes `[x1, y1, x2, y2]` into the persisted `bbox_x`, `bbox_y`, `bbox_w`, and `bbox_h` fields, while automatically mapping granular YOLO class names (like `PET_bottle`) into generic frontend categories (`plastic`, `metal`, `glass`) via `waste_mapping.json`.
 
 `POST /api/v1/detections` is fully synchronous. It receives an image, saves it, performs ML inference, plots bounding boxes to a new image file, saves the new image, updates all metadata, calculates summaries, and persists to PostgreSQL before returning a `201 Created` response.
 
-The backend acts as the single source of truth for detections and classifications, ensuring any Next.js frontend or Mobile app does not have to reproduce complex logic.
+The backend acts as the single source of truth for detections, risk scores, and classifications, ensuring any Next.js frontend or Mobile app does not have to reproduce complex logic.

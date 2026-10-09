@@ -17,7 +17,6 @@ export function StatCard({ stat, index }: StatCardProps) {
   const isNeutral = stat.trend === 'neutral';
   const TrendIcon = isNeutral ? Minus : isPositive ? TrendingUp : TrendingDown;
 
-  // Generate a simple sparkline dataset
   const sparkData = Array.from({ length: 12 }, (_, i) => ({
     v: Math.floor(stat.value * (0.7 + Math.sin(i * 0.8 + index) * 0.3 + Math.random() * 0.1)),
   }));
@@ -46,15 +45,17 @@ export function StatCard({ stat, index }: StatCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.04 }}
       whileHover={{ y: -2, transition: { duration: 0.2 } }}
-      className="group glass rounded-2xl p-4 cursor-default transition-shadow hover:shadow-lg relative overflow-hidden"
+      className="group glass rounded-2xl p-4 cursor-default transition-shadow hover:shadow-lg relative overflow-hidden border border-slate-200/50 dark:border-slate-800/50"
     >
       <div className="flex items-start justify-between">
-        <div className={cn('flex size-10 items-center justify-center rounded-xl', stat.color)}>
-          <Icon className={cn('size-5', stat.iconColor)} />
+        
+        <div className={cn('flex size-14 items-center justify-center rounded-xl relative overflow-hidden', stat.color)}>
+          <Icon className={cn('size-7', stat.iconColor)} />
         </div>
+
         <div
           className={cn(
-            'flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+            'flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold mt-1',
             trendBg,
             trendColor,
           )}

@@ -88,3 +88,6 @@ Thumbs.db
 .env.test.local
 .env.production.local
 *.pem
+
+*.pt
+old_models/

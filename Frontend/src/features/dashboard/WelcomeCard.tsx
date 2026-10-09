@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Leaf, Calendar } from 'lucide-react';
+import { Calendar, Activity, ShieldCheck } from 'lucide-react';
 
 export function WelcomeCard() {
   const now = new Date();
@@ -20,31 +20,45 @@ export function WelcomeCard() {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="flex items-center justify-between gap-4"
+      transition={{ duration: 0.5 }}
+      className="relative overflow-hidden rounded-3xl glass border border-slate-200/50 dark:border-slate-800/50 bg-gradient-to-br from-slate-100 to-white dark:from-slate-900/90 dark:to-slate-900/40 p-8 sm:p-10"
     >
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 shrink-0">
-          <Leaf className="size-5 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-            {greeting}, Admin 👋
+      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8 h-full">
+        <div className="max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
+            <span className="relative flex size-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full size-2 bg-primary"></span>
+            </span>
+            System Online & Monitoring
+          </div>
+          
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground mb-4">
+            {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-cyan-500">Admin</span>
           </h1>
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
-            <Calendar className="size-3.5" />
-            <span>{formattedDate}</span>
+          
+          <p className="text-muted-foreground text-lg mb-8 leading-relaxed max-w-xl">
+            PlasticSense AI is actively scanning global hotspots. All neural networks are operating at peak efficiency. Here is your daily overview.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/50 px-4 py-2 rounded-xl">
+              <Calendar className="size-4 text-primary" />
+              {formattedDate}
+            </div>
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/50 px-4 py-2 rounded-xl">
+              <Activity className="size-4 text-emerald-500" />
+              1.2M Scans Today
+            </div>
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/50 px-4 py-2 rounded-xl">
+              <ShieldCheck className="size-4 text-blue-500" />
+              Secure Connection
+            </div>
           </div>
         </div>
-      </div>
-      <div className="hidden sm:flex items-center gap-4">
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">Platform Status</p>
-          <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-            <span className="size-2 rounded-full bg-emerald-500 inline-block" />
-            Operational
-          </p>
-        </div>
+
+        {/* Removed 3D Canvas from here, maintaining the background gradient flow */}
+        <div className="absolute right-0 top-0 bottom-0 w-[45%] hidden md:block opacity-30 bg-gradient-to-l from-primary/10 to-transparent pointer-events-none" />
       </div>
     </motion.div>
   );
