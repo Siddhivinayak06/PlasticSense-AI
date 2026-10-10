@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "PlasticSense AI ML Service"
+    PROJECT_NAME: str = "WasteSense AI ML Service"
     VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"

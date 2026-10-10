@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.domain.entities.detection import Detection
 from app.domain.entities.location import Location
 from app.domain.entities.risk_assessment import RiskAssessment
-from app.infrastructure.external.storage_client import LocalStorageClient
+from app.infrastructure.external.storage_client import StorageClient
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".jfif", ".bmp"}
 ALLOWED_MIME_TYPES = {
@@ -31,14 +31,14 @@ class DetectionService:
         repository: IDetectionRepository,
         ml_client: IMLClient,
         risk_service: RiskService,
-        storage_client: Optional[LocalStorageClient] = None,
+        storage_client: Optional[StorageClient] = None,
         feature_engine: Optional[FeatureEngine] = None,
     ):
         self.repository = repository
         self.ml_client = ml_client
         self.risk_service = risk_service
-        self.storage_client = storage_client or LocalStorageClient(upload_dir=settings.UPLOAD_DIR)
-        self.result_storage_client = LocalStorageClient(upload_dir=settings.RESULTS_DIR)
+        self.storage_client = storage_client or StorageClient()
+        self.result_storage_client = StorageClient()
         self.feature_engine = feature_engine or FeatureEngine()
 
     def create_detection(self, dto: DetectionCreateDTO) -> DetectionResponseDTO:

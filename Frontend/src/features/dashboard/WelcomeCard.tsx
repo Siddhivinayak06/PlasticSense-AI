@@ -38,7 +38,7 @@ export function WelcomeCard() {
           </h1>
           
           <p className="text-muted-foreground text-lg mb-8 leading-relaxed max-w-xl">
-            PlasticSense AI is actively scanning global hotspots. All neural networks are operating at peak efficiency. Here is your daily overview.
+            WasteSense AI is actively scanning global hotspots. All neural networks are operating at peak efficiency. Here is your daily overview.
           </p>
 
           <div className="flex flex-wrap items-center gap-6">

@@ -8,10 +8,19 @@ import { sidebarMenuGroups, APP_VERSION, TEAM_NAME } from '@/constants/navigatio
 import { useActiveRoute } from '@/hooks/useActiveRoute';
 import { useSidebar } from '@/hooks/useSidebar';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
+import { fetchDashboardSummary, DashboardSummary } from '@/services/analytics';
 
 export function Sidebar() {
   const { isCollapsed, toggleCollapse } = useSidebar();
   const { isActive } = useActiveRoute();
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+
+  useEffect(() => {
+    fetchDashboardSummary()
+      .then(data => setSummary(data))
+      .catch(console.error);
+  }, []);
 
   return (
     <aside
@@ -87,11 +96,23 @@ export function Sidebar() {
                     {!isCollapsed && (
                       <>
                         <span className="relative z-10">{item.label}</span>
-                        {item.badge && (
-                          <span className="ml-auto relative z-10 flex size-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                            {item.badge}
-                          </span>
-                        )}
+                        {(() => {
+                          let displayBadge = item.badge;
+                          if (summary) {
+                            if (item.id === 'hotspots' && summary.critical_hotspots !== undefined) {
+                              displayBadge = summary.critical_hotspots;
+                            } else if (item.id === 'assignments' && summary.pending_cleanups !== undefined) {
+                              displayBadge = summary.pending_cleanups;
+                            } else if (item.id === 'verification' && summary.completed_cleanups !== undefined) {
+                              displayBadge = summary.completed_cleanups - (summary.verified_cleanups || 0);
+                            }
+                          }
+                          return displayBadge ? (
+                            <span className="ml-auto relative z-10 flex size-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                              {displayBadge}
+                            </span>
+                          ) : null;
+                        })()}
                       </>
                     )}
                   </Link>

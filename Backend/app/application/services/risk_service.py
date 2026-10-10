@@ -12,7 +12,7 @@ from app.application.services.risk_engine import RiskAssessmentResult, RiskEngin
 from app.domain.entities.detection import Detection
 from app.domain.entities.risk_assessment import RiskAssessment
 
-logger = logging.getLogger("PlasticSense_AI")
+logger = logging.getLogger("WasteSense_AI")
 
 
 class RiskService:
@@ -62,6 +62,8 @@ class RiskService:
             "material_proportions": features.material_proportions,
             "hazard_indicators": features.hazard_indicators,
             "component_weights": assessment_result.component_weights,
+            "logistics": assessment_result.logistics,
+            "estimated_density_label": assessment_result.estimated_density_label,
         }
 
         assessment = RiskAssessment(

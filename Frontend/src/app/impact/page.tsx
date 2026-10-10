@@ -126,7 +126,7 @@ export default function ImpactPage() {
         className="glass rounded-2xl p-6 text-center bg-gradient-to-r from-primary/5 via-transparent to-emerald-500/5"
       >
         <p className="text-lg font-semibold text-foreground">
-          PlasticSense AI has analyzed <span className="text-primary">{totalDetections} field images</span>, identifying <span className="text-primary">{totalObjects} waste objects</span> with <span className="text-emerald-500">{avgReduction}% waste reduction</span> across completed cleanup operations.
+          WasteSense AI has analyzed <span className="text-primary">{totalDetections} field images</span>, identifying <span className="text-primary">{totalObjects} waste objects</span> with <span className="text-emerald-500">{avgReduction}% waste reduction</span> across completed cleanup operations.
         </p>
         <p className="text-sm text-muted-foreground mt-2">
           Coordinating {activeNgos} active NGO partner teams to turn computer vision detections into verifiable environmental action.

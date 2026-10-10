@@ -1,8 +1,8 @@
-# PlasticSense AI 🌍♻️
+# WasteSense AI 🌍♻️
 
-PlasticSense AI is an intelligent environmental monitoring and decision-support platform designed to detect, classify, and track **general waste** in real-time. By leveraging computer vision and machine learning (YOLOv11), it empowers organizations and volunteers to identify pollution hotspots across various categories (plastics, metals, glass, paper, bio), coordinate cleanup efforts, and analyze environmental trends.
+WasteSense AI is an intelligent environmental monitoring and decision-support platform designed to detect, classify, and track **general waste** in real-time. By leveraging computer vision and machine learning (YOLOv11), it empowers organizations and volunteers to identify pollution hotspots across various categories (plastics, metals, glass, paper, bio), coordinate cleanup efforts, and analyze environmental trends.
 
-Built as an IEEE-level project, PlasticSense AI goes beyond being just "a web app that calls a model." It implements a robust **Clean Architecture** ensuring the core business logic remains fully isolated from external frameworks, databases, and ML inferences.
+Built as an IEEE-level project, WasteSense AI goes beyond being just "a web app that calls a model." It implements a robust **Clean Architecture** ensuring the core business logic remains fully isolated from external frameworks, databases, and ML inferences.
 
 ---
 
@@ -18,7 +18,7 @@ Built as an IEEE-level project, PlasticSense AI goes beyond being just "a web ap
 
 ## 🏗️ System Architecture & Design Philosophy
 
-PlasticSense AI is composed of **four independently deployable systems** that communicate exclusively through well-defined network contracts (REST APIs):
+WasteSense AI is composed of **four independently deployable systems** that communicate exclusively through well-defined network contracts (REST APIs):
 
 1. **Web Dashboard (Next.js):** Displays maps, analytics, and risk scores. Contains no core business logic, ensuring a thin client.
 2. **Flutter Mobile App (Future):** For field workers to capture waste photos + GPS locations, communicating with the same REST endpoints.
@@ -57,17 +57,17 @@ FastAPI service implementing Clean Architecture.
 ## 📂 Project Structure
 
 ```
-PlasticSense-AI/
+WasteSense-AI/
 ├── Frontend/               # Next.js web application
 ├── Backend/                # FastAPI Services, YOLO client, PostgreSQL DB
 ├── ML-service/             # Standalone YOLO inference microservice
 ├── Ml-model/               # Machine Learning notebooks & dataset processing
 ├── old_models/             # Previous ML models and checkpoints
-├── PlasticSense_AI_Architecture_Document.md # Detailed architecture specification
+├── WasteSense_AI_Architecture_Document.md # Detailed architecture specification
 └── README.md
 ```
 
-*(See `PlasticSense_AI_Architecture_Document.md` for an in-depth breakdown of the Clean Architecture layers and dependency flow.)*
+*(See `WasteSense_AI_Architecture_Document.md` for an in-depth breakdown of the Clean Architecture layers and dependency flow.)*
 
 ---
 

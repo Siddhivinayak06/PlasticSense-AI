@@ -4,7 +4,7 @@ from app.core.config import settings
 
 
 def setup_logging() -> logging.Logger:
-    logger = logging.getLogger("plasticsense")
+    logger = logging.getLogger("wastesense")
     logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
 
     if not logger.handlers:

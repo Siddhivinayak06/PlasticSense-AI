@@ -142,6 +142,7 @@ export default function HistoryDetailPage() {
         <ImageComparison
           originalImage={resolveImageUrl(detection.image_url)}
           annotatedImage={resolveImageUrl(detection.annotated_image_url || detection.image_url)}
+          items={detection.items}
         />
       </div>
 

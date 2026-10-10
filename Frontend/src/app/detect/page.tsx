@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload,
@@ -20,7 +20,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { submitDetection, fetchRiskAssessment, resolveImageUrl } from '@/services/detection';
+import { submitDetection, fetchRiskAssessment, resolveImageUrl, fetchSystemHealth, fetchSystemConfig } from '@/services/detection';
 import type { Detection, DetectionItem, RiskAssessment } from '@/types/detection';
 import exifr from 'exifr';
 import { cn } from '@/lib/utils';
@@ -134,11 +134,13 @@ function DetectionResults({
   risk,
   imageUrl,
   file,
+  systemConfig,
 }: {
   detection: Detection;
   risk: RiskAssessment | null;
   imageUrl: string;
   file?: File;
+  systemConfig?: any;
 }) {
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
@@ -237,8 +239,11 @@ function DetectionResults({
                         </div>
                         <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-primary rounded-full transition-all duration-1000"
-                            style={{ width: `${Math.min(100, Math.max(5, (Number(cov) / (wasteCoverage || 1)) * 100))}%` }}
+                            className="h-full rounded-full transition-all duration-1000"
+                            style={{ 
+                              width: `${Math.min(100, Math.max(5, (Number(cov) / (wasteCoverage || 1)) * 100))}%`,
+                              backgroundColor: systemConfig?.waste_groups?.[material.toLowerCase()]?.hex || 'var(--primary)'
+                            }}
                           />
                         </div>
                         <div className="w-14 text-right text-[11px] font-semibold text-muted-foreground">{Number(cov).toFixed(2)}%</div>
@@ -258,8 +263,11 @@ function DetectionResults({
                         <div className="w-24 truncate text-[11px] font-medium text-foreground capitalize">{group}</div>
                         <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-primary rounded-full transition-all duration-1000"
-                            style={{ width: `${percentage}%` }}
+                            className="h-full rounded-full transition-all duration-1000"
+                            style={{ 
+                              width: `${percentage}%`,
+                              backgroundColor: systemConfig?.waste_groups?.[group.toLowerCase()]?.hex || 'var(--primary)'
+                            }}
                           />
                         </div>
                         <div className="w-12 text-right text-[11px] font-semibold text-muted-foreground">{percentage}%</div>
@@ -294,14 +302,19 @@ function DetectionResults({
               )
               .sort(([, a], [, b]) => b.count - a.count)
               .map(([className, data]) => {
-                const groupColors: Record<string, string> = {
-                  plastic: 'border-sky-500/30 bg-sky-500/5 text-sky-600 dark:text-sky-400',
-                  glass: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400',
-                  metal: 'border-slate-500/30 bg-slate-500/5 text-slate-600 dark:text-slate-400',
-                  paper: 'border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400',
-                  cardboard: 'border-orange-500/30 bg-orange-500/5 text-orange-600 dark:text-orange-400',
-                };
-                const groupClass = groupColors[data.group.toLowerCase()] || 'border-border/50 bg-muted/20 text-muted-foreground';
+                let groupClass = 'border-border/50 bg-muted/20 text-muted-foreground';
+                if (systemConfig?.waste_groups?.[data.group.toLowerCase()]) {
+                  groupClass = systemConfig.waste_groups[data.group.toLowerCase()].color;
+                } else {
+                  const groupColors: Record<string, string> = {
+                    plastic: 'border-sky-500/30 bg-sky-500/5 text-sky-600 dark:text-sky-400',
+                    glass: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400',
+                    metal: 'border-slate-500/30 bg-slate-500/5 text-slate-600 dark:text-slate-400',
+                    paper: 'border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400',
+                    cardboard: 'border-orange-500/30 bg-orange-500/5 text-orange-600 dark:text-orange-400',
+                  };
+                  groupClass = groupColors[data.group.toLowerCase()] || groupClass;
+                }
                 const avgConfidence = data.items.reduce((sum, i) => sum + i.confidence, 0) / data.count;
 
                 return (
@@ -420,6 +433,20 @@ export default function DetectPage() {
   const [detection, setDetection] = useState<Detection | null>(null);
   const [risk, setRisk] = useState<RiskAssessment | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [systemOnline, setSystemOnline] = useState(true);
+  const [systemConfig, setSystemConfig] = useState<any>(null);
+
+  useEffect(() => {
+    fetchSystemHealth().then((data) => {
+      setSystemOnline(data?.status === 'ok');
+    }).catch(() => {
+      setSystemOnline(false);
+    });
+
+    fetchSystemConfig().then((data) => {
+      setSystemConfig(data);
+    }).catch(console.error);
+  }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -567,13 +594,22 @@ export default function DetectPage() {
         </div>
 
         {/* System Status */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 shrink-0">
-          <div className="relative flex size-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-            <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
+        {systemOnline ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+            <div className="relative flex size-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
+            </div>
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">AI System Online</span>
           </div>
-          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">AI System Online</span>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 shrink-0">
+            <div className="relative flex size-2">
+              <span className="relative inline-flex rounded-full size-2 bg-red-500"></span>
+            </div>
+            <span className="text-xs font-medium text-red-600 dark:text-red-400">AI System Offline</span>
+          </div>
+        )}
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -808,6 +844,7 @@ export default function DetectPage() {
                   risk={risk}
                   imageUrl={resolveImageUrl(detection.image_url)}
                   file={file!}
+                  systemConfig={systemConfig}
                 />
               )}
             </AnimatePresence>

@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 
-MODEL = r"C:\PlasticSenseAI\runs\yolo11s_plasticsense_final\weights\best.pt"
-IMAGE = r"C:\PlasticSenseAI\field_test\1.jpg"
+MODEL = r"C:\WasteSenseAI\runs\yolo11s_wastesense_final\weights\best.pt"
+IMAGE = r"C:\WasteSenseAI\field_test\1.jpg"
 
 print("=" * 60)
 print("LOADING MODEL 1")
@@ -23,7 +23,7 @@ results = model.predict(
     imgsz=960,
     conf=0.10,
     save=True,
-    project=r"C:\PlasticSenseAI\dual_model_test",
+    project=r"C:\WasteSenseAI\dual_model_test",
     name="model1_diagnostic",
     exist_ok=True,
     verbose=True

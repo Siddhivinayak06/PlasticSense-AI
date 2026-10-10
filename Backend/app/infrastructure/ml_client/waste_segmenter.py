@@ -16,7 +16,7 @@ from app.application.interfaces.i_waste_segmenter import (
 )
 from app.core.config import resolve_model_path, settings
 
-logger = logging.getLogger("PlasticSense_AI")
+logger = logging.getLogger("WasteSense_AI")
 
 # Palette for material segmentation masks (BGR colors for OpenCV)
 MATERIAL_COLORS = {

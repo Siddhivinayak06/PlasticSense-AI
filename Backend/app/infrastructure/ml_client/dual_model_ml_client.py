@@ -13,7 +13,7 @@ from app.application.interfaces.i_waste_segmenter import IWasteSegmenter
 from app.infrastructure.ml_client.waste_detector import WasteDetector
 from app.infrastructure.ml_client.waste_segmenter import WasteSegmenter
 
-logger = logging.getLogger("PlasticSense_AI")
+logger = logging.getLogger("WasteSense_AI")
 
 
 class DualModelMLClient(IMLClient):

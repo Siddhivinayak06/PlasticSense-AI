@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "PlasticSense AI Backend"
+    PROJECT_NAME: str = "WasteSense AI Backend"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
@@ -24,8 +24,11 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: Optional[str] = None
-    POSTGRES_DB: str = "plasticsense_db"
+    POSTGRES_DB: str = "wastesense_db"
     DATABASE_URL: Optional[str] = None
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_KEY: Optional[str] = None
+    SUPABASE_BUCKET_NAME: str = "images"
 
     # ── Storage / ML ──────────────────────────────────────────────────────────
     UPLOAD_DIR: str = "media/uploads"
@@ -33,7 +36,7 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 10
 
     # Dual Model Pipeline paths
-    DETECTOR_MODEL_PATH: str = "../Ml-model/handoff_to_cachyos/models/plasticsense_detector_best.pt"
+    DETECTOR_MODEL_PATH: str = "../Ml-model/handoff_to_cachyos/models/wastesense_detector_best.pt"
     SEGMENTER_MODEL_PATH: str = "../Ml-model/handoff_to_cachyos/models/taco_segmentation_best.pt"
     ARCHIVE_MODEL_PATH: str = "best.pt"
     MODEL_WEIGHTS_PATH: str = "best.pt"  # Legacy backwards compatibility

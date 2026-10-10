@@ -10,7 +10,7 @@ export function Footer() {
         <div className="flex items-center gap-3">
           <span>{APP_VERSION}</span>
           <span className="text-border">•</span>
-          <span>PlasticSense AI</span>
+          <span>WasteSense AI</span>
         </div>
       </div>
     </footer>

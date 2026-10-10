@@ -23,7 +23,7 @@ async def get_model_info(
         "pipeline": "Dual-Model Waste Inference Pipeline",
         "device": f"cuda ({device_name})" if cuda_available else "cpu",
         "detector": {
-            "name": "Custom PlasticSense Detector",
+            "name": "Custom WasteSense Detector",
             "architecture": "YOLO11s",
             "task": "object_detection",
             "model_path": getattr(detector, "model_path", settings.DETECTOR_MODEL_PATH),

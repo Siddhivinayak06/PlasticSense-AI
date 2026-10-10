@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.domain.entities.detection import DetectionItem
 
 import logging
-logger = logging.getLogger("PlasticSense_AI")
+logger = logging.getLogger("WasteSense_AI")
 
 
 class LocalYoloMLClient(IMLClient):

@@ -1,6 +1,6 @@
-# PlasticSense AI — Frontend Dashboard 🌍🎨
+# WasteSense AI — Frontend Dashboard 🌍🎨
 
-This is the **Next.js 16** frontend for the PlasticSense AI platform. It serves as a pure visualization and management layer for the General Waste Detection ML pipeline, providing interactive dashboards, historical data analysis, and geographic risk visualization.
+This is the **Next.js 16** frontend for the WasteSense AI platform. It serves as a pure visualization and management layer for the General Waste Detection ML pipeline, providing interactive dashboards, historical data analysis, and geographic risk visualization.
 
 ## 🌟 Key Features
 
@@ -26,7 +26,7 @@ This is the **Next.js 16** frontend for the PlasticSense AI platform. It serves 
 
 ### Prerequisites
 - Node.js (v20+ recommended)
-- Running instance of the PlasticSense Backend (FastAPI)
+- Running instance of the WasteSense Backend (FastAPI)
 
 ### 1. Environment Setup
 

@@ -1,4 +1,4 @@
-"""Waste Object Detector implementation (Model 1 — Custom PlasticSense YOLO11s)."""
+"""Waste Object Detector implementation (Model 1 — Custom WasteSense YOLO11s)."""
 
 import json
 import logging
@@ -19,7 +19,7 @@ from app.application.interfaces.i_waste_detector import (
 from app.core.config import resolve_model_path, settings
 from app.domain.entities.detection import DetectionItem
 
-logger = logging.getLogger("PlasticSense_AI")
+logger = logging.getLogger("WasteSense_AI")
 
 
 class WasteDetector(IWasteDetector):
@@ -140,7 +140,7 @@ class WasteDetector(IWasteDetector):
                     )
 
             return DetectorPrediction(
-                model_name="plasticsense_detector_yolo11s",
+                model_name="wastesense_detector_yolo11s",
                 items=items,
                 class_counts=class_counts,
                 total_objects=len(items),

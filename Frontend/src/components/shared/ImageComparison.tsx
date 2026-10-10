@@ -23,7 +23,7 @@ export function ImageComparison({
   onItemHover,
 }: ImageComparisonProps) {
   const [zoomedImg, setZoomedImg] = useState<string | null>(null);
-  const [showLabels, setShowLabels] = useState(false);
+  const [showLabels, setShowLabels] = useState(true);
   const [filterCategory, setFilterCategory] = useState('all');
 
   // Ref on the AI Detection image container — used for Fullscreen API

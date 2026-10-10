@@ -377,7 +377,7 @@ export default function LandingPage() {
               {
                 step: "02",
                 title: "AI Analysis",
-                desc: "PlasticSense AI instantly processes the image, categorizing and counting every piece of waste with bounding-box evidence.",
+                desc: "WasteSense AI instantly processes the image, categorizing and counting every piece of waste with bounding-box evidence.",
                 color: "text-cyan-600 dark:text-cyan-400",
                 border: "border-cyan-500/20",
                 bg: "bg-cyan-50/50 dark:bg-slate-900/40",
@@ -446,7 +446,7 @@ export default function LandingPage() {
             </h2>
             <p className="text-lg text-slate-500 dark:text-slate-400 mb-10 leading-relaxed">
               Powered by the latest Ultralytics models and trained on the TACO
-              dataset, PlasticSense AI instantly categorizes dozens of waste
+              dataset, WasteSense AI instantly categorizes dozens of waste
               types — plastics, metals, glass, bio-waste, and more — with
               industry-leading accuracy.
             </p>
@@ -546,7 +546,7 @@ export default function LandingPage() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
               <Leaf className="w-4 h-4 text-white dark:text-slate-950" />
             </div>
-            <span>PlasticSense AI &copy; 2026</span>
+            <span>WasteSense AI &copy; 2026</span>
           </div>
           <div className="flex items-center gap-8">
             <Link href="/dashboard" className="hover:text-slate-900 dark:hover:text-white transition-colors">Dashboard</Link>

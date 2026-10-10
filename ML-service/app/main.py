@@ -1,5 +1,5 @@
 """
-PlasticSense AI — ML Inference Service
+WasteSense AI — ML Inference Service
 Thin FastAPI micro-service that exposes a single /predict endpoint.
 The backend calls this over HTTP; it never imports any ML library directly.
 """
@@ -18,7 +18,7 @@ logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
-logger = logging.getLogger("plasticsense_ml")
+logger = logging.getLogger("wastesense_ml")
 
 # ── Global detector instance (loaded once at startup) ────────────────────────
 detector: PlasticDetector | None = None

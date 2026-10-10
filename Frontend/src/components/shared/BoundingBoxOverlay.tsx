@@ -30,7 +30,7 @@ const LABEL_PAD = 6;
 
 function formatLabel(className: string, confidence: number): string {
   const name = className.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  return `${name} ${confidence.toFixed(2)}`;
+  return `${name} ${Math.round(confidence * 100)}%`;
 }
 
 interface ImageLayout {

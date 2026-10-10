@@ -11,7 +11,7 @@ import logging
 from app.application.interfaces.i_waste_detector import DetectorPrediction
 from app.application.interfaces.i_waste_segmenter import SegmenterPrediction
 
-logger = logging.getLogger("PlasticSense_AI")
+logger = logging.getLogger("WasteSense_AI")
 
 
 @dataclass(frozen=True)
@@ -80,7 +80,7 @@ class FeatureEngine:
             material_cnts = {k.lower(): int(v) for k, v in segmenter_result.material_counts.items()}
             segmented_count = int(segmenter_result.total_masks)
 
-        # 2. Fine-grained detections from Model 1 (PlasticSense Detector)
+        # 2. Fine-grained detections from Model 1 (WasteSense Detector)
         obj_count = 0
         cls_counts: Dict[str, int] = {}
         high_conf_count = 0

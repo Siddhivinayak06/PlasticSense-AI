@@ -25,14 +25,14 @@ export function ProfileMenu() {
         </Avatar>
         <div className="hidden lg:flex flex-col items-start">
           <span className="text-xs font-semibold text-foreground">Admin User</span>
-          <span className="text-[10px] text-muted-foreground">PlasticSense AI</span>
+          <span className="text-[10px] text-muted-foreground">WasteSense AI</span>
         </div>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56" sideOffset={8}>
         <div className="flex flex-col gap-1 pb-2 px-2 pt-1.5 border-b border-border/50 mb-1">
           <span className="text-sm font-semibold">Admin User</span>
-          <span className="text-xs text-muted-foreground font-normal">admin@plasticsense.ai</span>
+          <span className="text-xs text-muted-foreground font-normal">admin@wastesense.ai</span>
           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full w-fit mt-0.5">
             Administrator
           </span>

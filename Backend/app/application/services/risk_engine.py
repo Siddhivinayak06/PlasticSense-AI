@@ -1,4 +1,4 @@
-"""Deterministic Risk Engine for PlasticSense AI.
+"""Deterministic Risk Engine for WasteSense AI.
 
 Combines structured visual features (waste coverage, density, material composition, hazards)
 into a transparent, deterministic engineering decision-support score (0-100), severity level,
@@ -12,7 +12,7 @@ import logging
 from app.application.services.feature_engine import StructuredVisualFeatures
 from app.core.config import settings
 
-logger = logging.getLogger("PlasticSense_AI")
+logger = logging.getLogger("WasteSense_AI")
 
 
 @dataclass(frozen=True)
@@ -25,6 +25,8 @@ class RiskAssessmentResult:
     component_scores: Dict[str, float]   # Sub-component scores (0-100 each)
     component_weights: Dict[str, float]  # Configured weights
     explanation: str                     # Human-readable rationale
+    logistics: Dict[str, str]            # Recommended team, time, resources, urgency
+    estimated_density_label: str         # "Low", "Medium", "High", "Severe"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert assessment result to JSON-serializable dict."""
@@ -36,6 +38,8 @@ class RiskAssessmentResult:
             "component_scores": self.component_scores,
             "component_weights": self.component_weights,
             "explanation": self.explanation,
+            "logistics": self.logistics,
+            "estimated_density_label": self.estimated_density_label,
         }
 
 
@@ -203,6 +207,46 @@ class RiskEngine:
             "weight_hazard": round(self.w_hazard, 2),
         }
 
+        # 8. Logistics & Density Label Mapping
+        if features.total_effective_objects > 50:
+            estimated_density_label = "Severe"
+        elif features.total_effective_objects > 20:
+            estimated_density_label = "High"
+        elif features.total_effective_objects > 10:
+            estimated_density_label = "Medium"
+        else:
+            estimated_density_label = "Low"
+
+        logistics = {}
+        if level == "low":
+            logistics = {
+                "team_size": "Small Volunteer Group (2-3)",
+                "estimated_time": "1-2 hours",
+                "suggested_resources": "Trash bags, gloves, pickers",
+                "target_response_urgency": "Within 2-4 weeks"
+            }
+        elif level == "medium":
+            logistics = {
+                "team_size": "Standard Team (4-8)",
+                "estimated_time": "3-4 hours",
+                "suggested_resources": "Trash bags, gloves, pickers, 1 small collection vehicle",
+                "target_response_urgency": "Within 1-2 weeks"
+            }
+        elif level == "high":
+            logistics = {
+                "team_size": "Large Cleanup Team (10-15)",
+                "estimated_time": "5-8 hours",
+                "suggested_resources": "Heavy duty bags, shovels, 2 collection vehicles, safety gear",
+                "target_response_urgency": "Within 3-5 days"
+            }
+        else: # critical
+            logistics = {
+                "team_size": "Professional NGO Team + Volunteers (20+)",
+                "estimated_time": "Multiple days",
+                "suggested_resources": "Machinery/JCB (if accessible), multiple large trucks, specialized safety equipment",
+                "target_response_urgency": "Immediate action (24-48 hours)"
+            }
+
         return RiskAssessmentResult(
             score=final_score,
             severity=severity,
@@ -211,4 +255,6 @@ class RiskEngine:
             component_scores=component_scores,
             component_weights=component_weights,
             explanation=explanation,
+            logistics=logistics,
+            estimated_density_label=estimated_density_label,
         )

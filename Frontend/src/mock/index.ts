@@ -279,7 +279,7 @@ export const notifications: Notification[] = [
   {
     id: 'notif-5',
     title: 'System Update',
-    message: 'PlasticSense AI model v2.3 deployed with improved detection.',
+    message: 'WasteSense AI model v2.3 deployed with improved detection.',
     category: 'info',
     timestamp: '6 hours ago',
     read: true,

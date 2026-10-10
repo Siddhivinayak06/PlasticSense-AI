@@ -1,4 +1,4 @@
-# PlasticSense AI — System Architecture Document
+# WasteSense AI — System Architecture Document
 
 **Document type:** Pre-Development Architecture Specification
 **Prepared as:** Senior Architecture Review
@@ -9,7 +9,7 @@
 
 ## 1. Purpose of This Document
 
-Before a single line of code is written, this document defines **how PlasticSense AI is structured, why it is structured that way, and how every module communicates with every other module**. It is written so that:
+Before a single line of code is written, this document defines **how WasteSense AI is structured, why it is structured that way, and how every module communicates with every other module**. It is written so that:
 
 - A backend developer knows exactly which folder a piece of logic belongs in.
 - A frontend/Flutter developer knows the system will never break under them.
@@ -20,7 +20,7 @@ Before a single line of code is written, this document defines **how PlasticSens
 
 ## 2. Guiding Design Philosophy
 
-PlasticSense AI is **not** "a web app that calls a model." It is a **decision-support platform** where object detection is just one data source feeding into higher-level reasoning (Risk Engine, Analytics, Hotspot Detection). Because of this, the architecture treats **ML as a replaceable plugin**, not as the core of the system.
+WasteSense AI is **not** "a web app that calls a model." It is a **decision-support platform** where object detection is just one data source feeding into higher-level reasoning (Risk Engine, Analytics, Hotspot Detection). Because of this, the architecture treats **ML as a replaceable plugin**, not as the core of the system.
 
 Three non-negotiable design rules govern everything below:
 
@@ -120,7 +120,7 @@ Clean Architecture organizes code into **concentric layers**, where dependencies
 ## 6. Backend Folder Structure
 
 ```
-plasticsense-backend/
+wastesense-backend/
 │
 ├── app/
 │   ├── main.py                     # FastAPI app entrypoint, wires everything together
@@ -224,7 +224,7 @@ This table is the direct implementation of the **Dependency Inversion Principle*
 
 ## 8. SOLID Principles Mapped to Real Files
 
-| Principle | How PlasticSense AI Applies It |
+| Principle | How WasteSense AI Applies It |
 |---|---|
 | **S — Single Responsibility** | `DetectionService` only orchestrates detection; `RiskService` only computes risk; `HotspotService` only clusters — each service has exactly one reason to change. |
 | **O — Open/Closed** | New waste-risk rules can be added to `RiskService` via new strategy classes without editing existing ones (see Risk Engine section below). |

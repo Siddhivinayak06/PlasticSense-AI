@@ -7,10 +7,19 @@ import { Button } from '@/components/ui/button';
 import { sidebarMenuGroups, APP_VERSION, TEAM_NAME } from '@/constants/navigation';
 import { useActiveRoute } from '@/hooks/useActiveRoute';
 import { useSidebar } from '@/hooks/useSidebar';
+import { useEffect, useState } from 'react';
+import { fetchDashboardSummary, DashboardSummary } from '@/services/analytics';
 
 export function MobileDrawer() {
   const { isMobileOpen, closeMobile } = useSidebar();
   const { isActive } = useActiveRoute();
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+
+  useEffect(() => {
+    fetchDashboardSummary()
+      .then(data => setSummary(data))
+      .catch(console.error);
+  }, []);
 
   return (
     <AnimatePresence>
@@ -40,7 +49,7 @@ export function MobileDrawer() {
                 <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
                   <Leaf className="size-4 text-primary" />
                 </div>
-                <span className="text-sm font-bold text-foreground">PlasticSense AI</span>
+                <span className="text-sm font-bold text-foreground">WasteSense AI</span>
               </div>
               <Button variant="ghost" size="icon-sm" onClick={closeMobile}>
                 <X className="size-4" />
@@ -71,11 +80,23 @@ export function MobileDrawer() {
                         >
                           <Icon className="size-4 shrink-0" />
                           <span>{item.label}</span>
-                          {item.badge && (
-                            <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                              {item.badge}
-                            </span>
-                          )}
+                          {(() => {
+                            let displayBadge = item.badge;
+                            if (summary) {
+                              if (item.id === 'hotspots' && summary.critical_hotspots !== undefined) {
+                                displayBadge = summary.critical_hotspots;
+                              } else if (item.id === 'assignments' && summary.pending_cleanups !== undefined) {
+                                displayBadge = summary.pending_cleanups;
+                              } else if (item.id === 'verification' && summary.completed_cleanups !== undefined) {
+                                displayBadge = summary.completed_cleanups - (summary.verified_cleanups || 0);
+                              }
+                            }
+                            return displayBadge ? (
+                              <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                {displayBadge}
+                              </span>
+                            ) : null;
+                          })()}
                         </Link>
                       );
                     })}

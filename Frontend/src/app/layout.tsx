@@ -9,7 +9,7 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "PlasticSense AI",
+  title: "WasteSense AI",
   description: "Intelligent Plastic Pollution Monitoring & Cleanup Decision Support System",
 };
 

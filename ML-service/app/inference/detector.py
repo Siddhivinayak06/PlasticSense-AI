@@ -10,7 +10,7 @@ from ultralytics import YOLO
 
 from app.schemas.predict import DetectionItem
 
-logger = logging.getLogger("plasticsense_ml")
+logger = logging.getLogger("wastesense_ml")
 
 
 class PlasticDetector:

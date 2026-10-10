@@ -26,7 +26,7 @@ class DualModelInferenceTests(unittest.TestCase):
         self.assertEqual(len(detector.class_names), 10)
 
         pred = detector.predict(self.test_img)
-        self.assertEqual(pred.model_name, "plasticsense_detector_yolo11s")
+        self.assertEqual(pred.model_name, "wastesense_detector_yolo11s")
         self.assertIsInstance(pred.items, list)
         self.assertIsInstance(pred.class_counts, dict)
         self.assertGreaterEqual(pred.processing_time_ms, 0)

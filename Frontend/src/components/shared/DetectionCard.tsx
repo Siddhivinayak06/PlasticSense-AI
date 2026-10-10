@@ -34,19 +34,25 @@ export function ConfidenceBadge({ confidence }: ConfidenceBadgeProps) {
 interface DetectionCardProps {
   item: DetectionItem;
   index: number;
+  config?: any;
 }
 
-export function DetectionCard({ item, index }: DetectionCardProps) {
-  // Simple mapping for colors based on waste group
-  const groupColors: Record<string, string> = {
-    plastic: 'border-sky-500/30 bg-sky-500/5 text-sky-600 dark:text-sky-400',
-    glass: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400',
-    metal: 'border-slate-500/30 bg-slate-500/5 text-slate-600 dark:text-slate-400',
-    paper: 'border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400',
-    cardboard: 'border-orange-500/30 bg-orange-500/5 text-orange-600 dark:text-orange-400',
-  };
-
-  const groupClass = groupColors[item.waste_group.toLowerCase()] || 'border-border/50 bg-muted/20 text-muted-foreground';
+export function DetectionCard({ item, index, config }: DetectionCardProps) {
+  let groupClass = 'border-border/50 bg-muted/20 text-muted-foreground';
+  
+  if (config && config.waste_groups && config.waste_groups[item.waste_group.toLowerCase()]) {
+    groupClass = config.waste_groups[item.waste_group.toLowerCase()].color;
+  } else {
+    // Fallback if config isn't loaded
+    const groupColors: Record<string, string> = {
+      plastic: 'border-sky-500/30 bg-sky-500/5 text-sky-600 dark:text-sky-400',
+      glass: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400',
+      metal: 'border-slate-500/30 bg-slate-500/5 text-slate-600 dark:text-slate-400',
+      paper: 'border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400',
+      cardboard: 'border-orange-500/30 bg-orange-500/5 text-orange-600 dark:text-orange-400',
+    };
+    groupClass = groupColors[item.waste_group.toLowerCase()] || groupClass;
+  }
 
   return (
     <div className={cn("flex items-center justify-between rounded-xl border p-3", groupClass)}>

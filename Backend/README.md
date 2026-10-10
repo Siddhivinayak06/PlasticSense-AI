@@ -1,6 +1,6 @@
-# PlasticSense AI — Backend (General Waste Detection)
+# WasteSense AI — Backend (General Waste Detection)
 
-FastAPI backend for the PlasticSense AI platform, implementing Clean Architecture across four
+FastAPI backend for the WasteSense AI platform, implementing Clean Architecture across four
 concentric layers: Domain → Application → Infrastructure → API. It features local YOLO11 inference for general waste detection and automated image annotation.
 
 ---
@@ -14,7 +14,7 @@ Backend/
 │   │
 │   ├── core/                       # Cross-cutting concerns (no business logic)
 │   │   ├── config.py               # Pydantic BaseSettings — reads .env, exposes settings singleton
-│   │   └── logging.py              # Centralized structured logger (plasticsense logger)
+│   │   └── logging.py              # Centralized structured logger (wastesense logger)
 │   │
 │   ├── domain/                     # ── INNERMOST LAYER — pure Python, zero framework imports ──
 │   │   ├── entities/
@@ -89,7 +89,7 @@ Key variables:
 | `POSTGRES_PORT` | `5432` | PostgreSQL port |
 | `POSTGRES_USER` | `postgres` | Database user |
 | `POSTGRES_PASSWORD` | *(required)* | Database password |
-| `POSTGRES_DB` | `plasticsense_db` | Database name |
+| `POSTGRES_DB` | `wastesense_db` | Database name |
 | `ENVIRONMENT` | `development` | `development` or `production` |
 | `LOG_LEVEL` | `INFO` | Logging level |
 | `CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed frontend origins |
@@ -100,7 +100,7 @@ Key variables:
 
 **PostgreSQL (required for Sprint 2):**
 ```
-DATABASE_URL="postgresql://user:password@host:5432/plasticsense_db"
+DATABASE_URL="postgresql://user:password@host:5432/wastesense_db"
 ```
 
 ---

@@ -1,4 +1,4 @@
-# PlasticSense AI — Backend Implementation Checklist
+# WasteSense AI — Backend Implementation Checklist
 
 ## Sprint 1 — Foundation ✅ COMPLETED
 

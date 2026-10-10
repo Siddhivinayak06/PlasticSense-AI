@@ -56,6 +56,16 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
   const rawLevel = (risk.level || risk.severity || 'medium').toLowerCase();
   const levelKey = (rawLevel === 'moderate' ? 'medium' : rawLevel) as keyof typeof SEVERITY_CONFIG;
   const config = SEVERITY_CONFIG[levelKey] || SEVERITY_CONFIG.medium;
+  const breakdown = risk.strategy_breakdown || {};
+  const logistics = breakdown.logistics || {};
+
+  const team = logistics.team_size || config.team;
+  const time = logistics.estimated_time || config.time;
+  const equipment = logistics.suggested_resources || config.equipment;
+  const urgency = logistics.target_response_urgency || config.urgency;
+  
+  const estimatedDensityLabel = breakdown.estimated_density_label || 
+    (wasteCount > 50 ? 'Severe' : wasteCount > 20 ? 'High' : wasteCount > 10 ? 'Medium' : 'Low');
 
   const scoreText = typeof risk.score === 'number' ? risk.score.toFixed(1) : (risk.score || 0);
 
@@ -72,7 +82,7 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
           <h3 className="text-sm font-semibold text-foreground">AI Recommended Action</h3>
         </div>
         <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', config.bg, config.color)}>
-          {risk.cleanup_priority ? `${risk.cleanup_priority} Priority` : `${risk.level || levelKey} Priority`}
+          {breakdown.cleanup_priority ? `${breakdown.cleanup_priority} Priority` : (risk.cleanup_priority ? `${risk.cleanup_priority} Priority` : `${risk.level || levelKey} Priority`)}
         </span>
       </div>
 
@@ -82,7 +92,7 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Assessment</p>
           <p className="text-sm font-medium text-foreground">
             {config.title}: <span className="font-normal text-muted-foreground">
-              {risk.explanation || risk.strategy_breakdown?.explanation || `Based on the detection of ${wasteCount} waste objects and a severity score of ${scoreText}/100.`}
+              {risk.explanation || breakdown.explanation || `Based on the detection of ${wasteCount} waste objects and a severity score of ${scoreText}/100.`}
             </span>
           </p>
         </div>
@@ -94,7 +104,7 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
             <Users className={cn('size-4 shrink-0', config.color)} />
             <div>
               <p className="text-[10px] text-muted-foreground uppercase font-medium">Recommended Team</p>
-              <p className="text-xs font-semibold text-foreground mt-0.5">{config.team}</p>
+              <p className="text-xs font-semibold text-foreground mt-0.5">{team}</p>
             </div>
           </div>
 
@@ -102,7 +112,7 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
             <Clock className={cn('size-4 shrink-0', config.color)} />
             <div>
               <p className="text-[10px] text-muted-foreground uppercase font-medium">Estimated Time</p>
-              <p className="text-xs font-semibold text-foreground mt-0.5">{config.time}</p>
+              <p className="text-xs font-semibold text-foreground mt-0.5">{time}</p>
             </div>
           </div>
 
@@ -111,7 +121,7 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
             <div>
               <p className="text-[10px] text-muted-foreground uppercase font-medium">Estimated Density</p>
               <p className="text-xs font-semibold text-foreground mt-0.5">
-                {wasteCount > 50 ? 'Severe' : wasteCount > 20 ? 'High' : wasteCount > 10 ? 'Medium' : 'Low'}
+                {estimatedDensityLabel}
               </p>
             </div>
           </div>
@@ -120,7 +130,7 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
             <Truck className={cn('size-4 shrink-0', config.color)} />
             <div>
               <p className="text-[10px] text-muted-foreground uppercase font-medium">Suggested Resources</p>
-              <p className="text-xs font-semibold text-foreground mt-0.5">{config.equipment}</p>
+              <p className="text-xs font-semibold text-foreground mt-0.5">{equipment}</p>
             </div>
           </div>
         </div>
@@ -130,7 +140,7 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
           <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
             <ShieldAlert className={cn('size-4', config.color)} />
             <span>Target Response:</span>
-            <span className={cn('font-bold', config.color)}>{config.urgency}</span>
+            <span className={cn('font-bold', config.color)}>{urgency}</span>
           </div>
 
           <Link href="/assignments" className="w-full sm:w-auto">

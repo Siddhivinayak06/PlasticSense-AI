@@ -3,11 +3,11 @@ from pathlib import Path
 import json
 import numpy as np
 
-MODEL_2 = r"C:\PlasticSenseAI\pretrained_tests\taco_yolo11_seg\best.pt"
+MODEL_2 = r"C:\WasteSenseAI\pretrained_tests\taco_yolo11_seg\best.pt"
 
-FIELD_TEST = Path(r"C:\PlasticSenseAI\field_test")
+FIELD_TEST = Path(r"C:\WasteSenseAI\field_test")
 
-OUTPUT = Path(r"C:\PlasticSenseAI\dual_model_test\coverage_results")
+OUTPUT = Path(r"C:\WasteSenseAI\dual_model_test\coverage_results")
 OUTPUT.mkdir(exist_ok=True)
 
 model = YOLO(MODEL_2)

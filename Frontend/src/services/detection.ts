@@ -68,3 +68,19 @@ export async function fetchMapDetections(): Promise<MapDetectionEnvelope> {
   const { data } = await api.get<MapDetectionEnvelope>('/detections/map');
   return data;
 }
+
+/**
+ * Fetch system health status
+ */
+export async function fetchSystemHealth(): Promise<any> {
+  const { data } = await api.get('/health');
+  return data;
+}
+
+/**
+ * Fetch system UI configuration
+ */
+export async function fetchSystemConfig(): Promise<any> {
+  const { data } = await api.get('/health/config');
+  return data;
+}

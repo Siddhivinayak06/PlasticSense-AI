@@ -100,7 +100,7 @@ cat << 'EOF' > src/components/layout/Navbar.tsx
 export function Navbar() {
   return (
     <header className="h-16 bg-white/60 backdrop-blur-md border-b flex items-center px-6 justify-between">
-      <h1 className="text-xl font-bold text-primary">PlasticSense AI</h1>
+      <h1 className="text-xl font-bold text-primary">WasteSense AI</h1>
       <div className="flex items-center gap-4">
         <span className="text-sm">User Profile</span>
       </div>
@@ -225,7 +225,7 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "PlasticSense AI",
+  title: "WasteSense AI",
   description: "Intelligent Plastic Pollution Monitoring & Cleanup Decision Support System",
 };
 

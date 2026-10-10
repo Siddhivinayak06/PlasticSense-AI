@@ -113,4 +113,4 @@ export const sidebarMenuGroups: SidebarMenuGroup[] = [
 ];
 
 export const APP_VERSION = 'v0.2.0';
-export const TEAM_NAME = 'PlasticSense Team';
+export const TEAM_NAME = 'WasteSense Team';

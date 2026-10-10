@@ -5,13 +5,13 @@ from pathlib import Path
 # MODEL PATHS
 # =========================
 
-MODEL_1 = r"C:\PlasticSenseAI\runs\yolo11s_plasticsense_final\weights\best.pt"
+MODEL_1 = r"C:\WasteSenseAI\runs\yolo11s_wastesense_final\weights\best.pt"
 
-MODEL_2 = r"C:\PlasticSenseAI\pretrained_tests\taco_yolo11_seg\best.pt"
+MODEL_2 = r"C:\WasteSenseAI\pretrained_tests\taco_yolo11_seg\best.pt"
 
-FIELD_TEST = r"C:\PlasticSenseAI\field_test"
+FIELD_TEST = r"C:\WasteSenseAI\field_test"
 
-OUTPUT = r"C:\PlasticSenseAI\dual_model_test"
+OUTPUT = r"C:\WasteSenseAI\dual_model_test"
 
 
 # =========================

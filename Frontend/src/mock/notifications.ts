@@ -83,7 +83,7 @@ export const mockNotifications: AppNotification[] = [
   {
     id: 'notif-8',
     title: 'AI Model updated',
-    message: 'PlasticSense AI detection model has been updated to v2.1 with improved accuracy.',
+    message: 'WasteSense AI detection model has been updated to v2.1 with improved accuracy.',
     category: 'info',
     type: 'system',
     timestamp: '2 days ago',
