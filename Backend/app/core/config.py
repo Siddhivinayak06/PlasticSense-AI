@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 10
 
     # Dual Model Pipeline paths
-    DETECTOR_MODEL_PATH: str = "../Ml-model/handoff_to_cachyos/models/wastesense_detector_best.pt"
-    SEGMENTER_MODEL_PATH: str = "../Ml-model/handoff_to_cachyos/models/taco_segmentation_best.pt"
+    DETECTOR_MODEL_PATH: str = "best.pt"
+    SEGMENTER_MODEL_PATH: str = "best1.pt"
     ARCHIVE_MODEL_PATH: str = "best.pt"
     MODEL_WEIGHTS_PATH: str = "best.pt"  # Legacy backwards compatibility
 
