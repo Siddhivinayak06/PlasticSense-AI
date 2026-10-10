@@ -2,7 +2,11 @@ import axios from 'axios';
 
 export function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+    let url = process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+    if (url.endsWith('/api/v1')) {
+      url = url.substring(0, url.length - 7);
+    }
+    return url;
   }
   if (typeof window !== 'undefined' && window.location?.hostname) {
     return `http://${window.location.hostname}:8000`;
