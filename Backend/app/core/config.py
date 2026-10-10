@@ -75,6 +75,8 @@ class Settings(BaseSettings):
             url = self.DATABASE_URL
             if url.startswith("postgres://"):
                 url = url.replace("postgres://", "postgresql://", 1)
+            if url.startswith("postgresql+psycopg://"):
+                url = url.replace("postgresql+psycopg://", "postgresql://", 1)
             return url
         # Fallback: build URL from individual vars
         if not self.POSTGRES_PASSWORD:
