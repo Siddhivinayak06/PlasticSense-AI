@@ -3,6 +3,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { motion } from 'framer-motion';
 import { Box } from 'lucide-react';
+import { cardEntrance } from '@/lib/motion';
 
 interface WasteDistributionChartProps {
   breakdown: Record<string, number>;
@@ -32,24 +33,30 @@ export function WasteDistributionChart({ breakdown }: WasteDistributionChartProp
       value,
       fill: COLORS[key.toLowerCase()] || COLORS.other,
     }))
-    .filter(item => item.value > 0);
+    .filter((item) => item.value > 0);
+
+  const totalCount = data.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.1 }}
-      className="glass rounded-2xl p-5 flex flex-col h-full min-h-[350px]"
+      variants={cardEntrance}
+      initial="hidden"
+      animate="visible"
+      className="glass rounded-3xl p-5 sm:p-6 flex flex-col h-full min-h-[350px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm"
     >
-      <div className="mb-2">
-        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Box className="size-4 text-primary" />
-          Waste Category Distribution
-        </h3>
-        <p className="text-xs text-muted-foreground mt-1">Breakdown of detected pollution by material type.</p>
+      <div className="flex items-center gap-2.5 mb-2">
+        <div className="flex size-8 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
+          <Box className="size-4" />
+        </div>
+        <div>
+          <h3 className="text-sm sm:text-base font-semibold text-foreground tracking-tight">
+            Waste Category Distribution
+          </h3>
+          <p className="text-xs text-muted-foreground">Breakdown of detected pollution by material type</p>
+        </div>
       </div>
 
-      <div className="flex-1 w-full mt-4">
+      <div className="flex-1 w-full mt-4 min-h-[260px] relative">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -57,28 +64,40 @@ export function WasteDistributionChart({ breakdown }: WasteDistributionChartProp
                 data={data}
                 cx="50%"
                 cy="50%"
-                innerRadius={70}
-                outerRadius={100}
-                paddingAngle={2}
+                innerRadius={68}
+                outerRadius={96}
+                paddingAngle={3}
                 dataKey="value"
                 stroke="none"
                 isAnimationActive={true}
+                animationDuration={900}
               >
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.fill} />
                 ))}
               </Pie>
-              <Tooltip 
-                contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--card))',
+                  backdropFilter: 'blur(12px)',
+                  borderColor: 'hsl(var(--border))',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                }}
                 itemStyle={{ color: 'hsl(var(--foreground))' }}
-                formatter={(value: any) => [value, 'Count']}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={(value: any) => [
+                  `${value} items (${Math.round(((value as number) / (totalCount || 1)) * 100)}%)`,
+                  'Volume',
+                ]}
               />
-              <Legend 
-                iconType="circle" 
-                layout="vertical" 
-                verticalAlign="middle" 
+              <Legend
+                iconType="circle"
+                layout="vertical"
+                verticalAlign="middle"
                 align="right"
-                wrapperStyle={{ fontSize: '12px' }}
+                wrapperStyle={{ fontSize: '11px', lineHeight: '22px' }}
               />
             </PieChart>
           </ResponsiveContainer>

@@ -6,15 +6,24 @@ router = APIRouter(prefix="/health", tags=["Health"])
 
 
 @router.get("", summary="System Health Check")
-async def health_check():
+def health_check():
     """
-    Health check endpoint returning system status and metadata.
+    Health check endpoint returning system status, database connectivity, and metadata.
     """
+    db_info = None
+    try:
+        from app.infrastructure.database.session import ping_database
+        db_info = ping_database()
+    except Exception as e:
+        db_info = {"status": "error", "error": str(e)}
+
+    is_healthy = db_info and db_info.get("status") == "connected"
     return {
-        "status": "ok",
+        "status": "ok" if is_healthy else "degraded",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
+        "database": db_info,
         "model_loaded": True,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

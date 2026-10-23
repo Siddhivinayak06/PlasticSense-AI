@@ -8,16 +8,29 @@ import {
   Building2,
   CheckCircle,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { fetchDashboardSummary } from '@/services/analytics';
 import { StatCard } from './StatCard';
+import { SkeletonCard } from '@/components/shared/LoadingSkeleton';
+import { containerVariants } from '@/lib/motion';
 import type { DashboardStat } from '@/types/dashboard';
 
 export function StatsGrid() {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['dashboardSummary'],
     queryFn: fetchDashboardSummary,
   });
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
+    );
+  }
 
   const totalReports = data?.total_detections ?? 0;
   const totalObjects = data?.total_objects_detected ?? 0;
@@ -86,14 +99,19 @@ export function StatsGrid() {
       trend: 'up',
       color: 'bg-emerald-500/10 dark:bg-emerald-500/20',
       iconColor: 'text-emerald-600 dark:text-emerald-400',
-    }
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="grid grid-cols-2 lg:grid-cols-3 gap-4"
+    >
       {dashboardKPIs.map((stat, index) => (
         <StatCard key={stat.id} stat={stat} index={index} />
       ))}
-    </div>
+    </motion.div>
   );
 }

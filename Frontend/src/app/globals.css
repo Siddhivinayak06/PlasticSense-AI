@@ -105,7 +105,15 @@
 }
 
 .glass {
-  @apply bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-white/20 dark:border-slate-800/50 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+  @apply bg-white/75 dark:bg-slate-900/75 backdrop-blur-xl border border-slate-200/70 dark:border-slate-800/70 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.04),0_1px_3px_rgba(0,0,0,0.02)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+}
+
+.glass-card {
+  @apply bg-white/85 dark:bg-slate-900/85 backdrop-blur-lg border border-slate-200/80 dark:border-slate-800/80 shadow-sm transition-all duration-300;
+}
+
+.glass-card:hover {
+  @apply border-primary/30 dark:border-primary/40 shadow-md dark:shadow-primary/5;
 }
 
 /* Custom scrollbar */
@@ -125,17 +133,17 @@
 
 /* Sidebar transition */
 .sidebar-transition {
-  transition: width 200ms cubic-bezier(0.4, 0, 0.2, 1),
-              padding 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1),
+              padding 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Pulse glow for urgent items */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
-  50% { box-shadow: 0 0 12px 4px rgba(239, 68, 68, 0.15); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35); }
+  50% { box-shadow: 0 0 16px 4px rgba(239, 68, 68, 0.2); }
 }
 .pulse-urgent {
-  animation: pulse-glow 2s ease-in-out infinite;
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Skeleton shimmer */
@@ -144,7 +152,7 @@
   100% { background-position: 200% 0; }
 }
 .skeleton-shimmer {
-  background: linear-gradient(90deg, transparent 25%, rgba(148,163,184,0.08) 50%, transparent 75%);
+  background: linear-gradient(90deg, transparent 25%, rgba(148,163,184,0.12) 50%, transparent 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
@@ -155,4 +163,22 @@
 }
 .score-ring {
   animation: score-fill 1s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html[data-magicui-theme-vt="active"]::view-transition-new(root) {
+  clip-path: var(--magicui-theme-vt-clip-from);
 }

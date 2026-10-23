@@ -1,0 +1,14 @@
+"use client";
+
+export * from "@/components/ui/animated-theme-toggler";
+export { AnimatedThemeToggler as default } from "@/components/ui/animated-theme-toggler";
+
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+
+export function AnimatedThemeTogglerDemo() {
+  return (
+    <div className="flex justify-center p-6">
+      <AnimatedThemeToggler />
+    </div>
+  );
+}

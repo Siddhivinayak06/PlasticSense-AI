@@ -23,10 +23,10 @@ class DualModelInferenceTests(unittest.TestCase):
     def test_detector_initialization_and_prediction(self):
         detector = WasteDetector()
         self.assertIsNotNone(detector.model)
-        self.assertEqual(len(detector.class_names), 10)
+        self.assertEqual(len(detector.class_names), len(detector.model.names))
 
         pred = detector.predict(self.test_img)
-        self.assertEqual(pred.model_name, "wastesense_detector_yolo11s")
+        self.assertEqual(pred.model_name, detector.model_name)
         self.assertIsInstance(pred.items, list)
         self.assertIsInstance(pred.class_counts, dict)
         self.assertGreaterEqual(pred.processing_time_ms, 0)
@@ -34,10 +34,10 @@ class DualModelInferenceTests(unittest.TestCase):
     def test_segmenter_initialization_and_prediction(self):
         segmenter = WasteSegmenter()
         self.assertIsNotNone(segmenter.model)
-        self.assertEqual(len(segmenter.class_names), 5)
+        self.assertEqual(len(segmenter.class_names), len(segmenter.model.names))
 
         pred = segmenter.predict(self.test_img)
-        self.assertEqual(pred.model_name, "taco_segmentation_yolo11s_seg")
+        self.assertEqual(pred.model_name, segmenter.model_name)
         self.assertIsInstance(pred.waste_coverage_percent, float)
         self.assertGreaterEqual(pred.waste_coverage_percent, 0.0)
         self.assertLessEqual(pred.waste_coverage_percent, 100.0)

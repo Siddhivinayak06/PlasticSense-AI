@@ -57,7 +57,7 @@ class DualModelMLClient(IMLClient):
                 or det_res.annotated_image_bytes
             )
 
-            model_version = "dual-model-v1.0 (YOLO11s-det + YOLO11s-seg)"
+            model_version = f"dual-model ({det_res.model_name} + {seg_res.model_name})"[:64]
 
             return MLPrediction(
                 model_version=model_version,
@@ -87,6 +87,16 @@ class DualModelMLClient(IMLClient):
                 if seg_vis is not None:
                     vis_img = seg_vis
 
+            CLASS_COLORS = {
+                "plastic": (235, 120, 10),    # Vibrant Electric Blue (BGR)
+                "paper": (11, 158, 245),      # Amber / Gold
+                "metal": (210, 180, 20),      # Cyan / Teal
+                "glass": (50, 205, 50),       # Emerald Green
+                "hazardous": (30, 30, 240),   # Crimson Red
+                "organic": (34, 139, 34),     # Forest Green
+                "other": (180, 80, 240),      # Neon Purple
+            }
+
             # Draw detector bounding boxes on top of the segmentation visualization
             for item in det_res.items:
                 x1 = int(item.bbox_x)
@@ -94,21 +104,25 @@ class DualModelMLClient(IMLClient):
                 x2 = int(item.bbox_x + item.bbox_w)
                 y2 = int(item.bbox_y + item.bbox_h)
 
-                # Draw crisp neon box
-                box_color = (0, 255, 255)  # Yellow for fine-grained boxes
+                group = (item.waste_group or "plastic").lower()
+                box_color = CLASS_COLORS.get(group, (235, 120, 10))
+
+                # Draw crisp bounding box
                 cv2.rectangle(vis_img, (x1, y1), (x2, y2), box_color, 2)
 
-                # Label badge
+                # Label badge with white text on filled color header
                 label = f"{item.class_name} {item.confidence:.2f}"
-                (w_label, h_label), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-                cv2.rectangle(vis_img, (x1, max(0, y1 - 20)), (x1 + w_label, max(0, y1)), box_color, -1)
+                (w_label, h_label), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+                badge_top = max(0, y1 - h_label - 6)
+                badge_bottom = max(h_label + 6, y1)
+                cv2.rectangle(vis_img, (x1, badge_top), (x1 + w_label + 8, badge_bottom), box_color, -1)
                 cv2.putText(
                     vis_img,
                     label,
-                    (x1, max(15, y1 - 5)),
+                    (x1 + 4, badge_bottom - 4),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 0, 0),
+                    0.45,
+                    (255, 255, 255),
                     1,
                     cv2.LINE_AA,
                 )

@@ -1,15 +1,15 @@
 import os
 import uuid
 import logging
-from typing import Tuple
+from typing import Optional, Tuple
 from app.core.config import settings
 from supabase import create_client, Client
 
 logger = logging.getLogger(__name__)
 
 class StorageClient:
-    def __init__(self):
-        self.upload_dir = settings.UPLOAD_DIR
+    def __init__(self, upload_dir: Optional[str] = None):
+        self.upload_dir = upload_dir or settings.UPLOAD_DIR
         self.use_supabase = bool(settings.SUPABASE_URL and settings.SUPABASE_KEY)
         
         if self.use_supabase:
@@ -17,7 +17,6 @@ class StorageClient:
             self.bucket_name = settings.SUPABASE_BUCKET_NAME
         else:
             os.makedirs(self.upload_dir, exist_ok=True)
-
     def save_file(self, file_bytes: bytes, original_filename: str) -> str:
         ext = os.path.splitext(original_filename)[1].lower()
         if not ext:
@@ -51,3 +50,4 @@ class StorageClient:
         return f"/static/uploads/{unique_filename}"
 
 storage_client = StorageClient()
+LocalStorageClient = StorageClient

@@ -14,7 +14,7 @@ from app.application.interfaces.i_waste_segmenter import (
     IWasteSegmenter,
     SegmenterPrediction,
 )
-from app.core.config import resolve_model_path, settings
+from app.core.config import resolve_inference_device, resolve_model_path, settings
 
 logger = logging.getLogger("WasteSense_AI")
 
@@ -24,13 +24,14 @@ MATERIAL_COLORS = {
     "metal": (139, 116, 100),    # Slate Gray
     "glass": (129, 185, 16),     # Emerald Green
     "paper": (11, 158, 245),     # Amber / Gold
+    "waste": (168, 85, 247),     # Purple
     "other": (168, 85, 247),     # Purple
 }
 DEFAULT_MASK_COLOR = (0, 0, 255)  # Red fallback
 
 
 class WasteSegmenter(IWasteSegmenter):
-    """Scene-level waste segmenter using TACO YOLO11s-seg."""
+    """Scene-level waste segmenter using YOLOv8/11-seg."""
 
     def __init__(
         self,
@@ -45,17 +46,23 @@ class WasteSegmenter(IWasteSegmenter):
         self.iou_threshold = iou_threshold if iou_threshold is not None else settings.SEGMENTER_IOU_THRESHOLD
         self.image_size = settings.IMAGE_SIZE
 
-        # Device determination
-        target_device = device or settings.INFERENCE_DEVICE
-        if target_device == "auto":
-            self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = target_device
+        # Device determination (CUDA, Apple Silicon MPS, or CPU)
+        self.device = resolve_inference_device(device)
 
         try:
             logger.info(f"Loading Waste Segmenter (Model 2) from {self.model_path} on {self.device}...")
             self.model = YOLO(self.model_path)
             self.class_names = self.model.names
+            import os
+            base = os.path.basename(self.model_path).replace(".pt", "")
+            if "taco" in base.lower():
+                self.model_name = "TACO-Seg"
+            elif "yolov8m" in base.lower():
+                self.model_name = "YOLOv8m-seg"
+            elif "yolo11" in base.lower():
+                self.model_name = "YOLO11-seg"
+            else:
+                self.model_name = base[:20]
             logger.info(
                 f"Waste Segmenter loaded successfully. Classes ({len(self.class_names)}): {list(self.class_names.values())}"
             )
@@ -145,7 +152,7 @@ class WasteSegmenter(IWasteSegmenter):
             annotated_image_bytes = encoded.tobytes() if success else None
 
             return SegmenterPrediction(
-                model_name="taco_segmentation_yolo11s_seg",
+                model_name=self.model_name,
                 waste_coverage_percent=waste_coverage_percent,
                 material_coverage=material_coverage,
                 material_counts=material_counts,

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Leaf, PanelLeftClose, PanelLeft, GitFork } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sidebarMenuGroups, APP_VERSION, TEAM_NAME } from '@/constants/navigation';
@@ -10,6 +10,7 @@ import { useSidebar } from '@/hooks/useSidebar';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { fetchDashboardSummary, DashboardSummary } from '@/services/analytics';
+import { springSmooth, microInteractions } from '@/lib/motion';
 
 export function Sidebar() {
   const { isCollapsed, toggleCollapse } = useSidebar();
@@ -18,39 +19,46 @@ export function Sidebar() {
 
   useEffect(() => {
     fetchDashboardSummary()
-      .then(data => setSummary(data))
+      .then((data) => setSummary(data))
       .catch(console.error);
   }, []);
 
   return (
     <aside
       className={cn(
-        'hidden md:flex flex-col h-full glass border-r border-border/50 sidebar-transition overflow-hidden shrink-0',
+        'hidden md:flex flex-col h-full glass border-r border-slate-200/60 dark:border-slate-800/60 sidebar-transition overflow-hidden shrink-0 z-20',
         isCollapsed ? 'w-[var(--sidebar-collapsed-width)]' : 'w-[var(--sidebar-width)]'
       )}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-16 border-b border-border/50 shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-2 overflow-hidden">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-            <Leaf className="size-4 text-primary" />
-          </div>
-          {!isCollapsed && (
-            <motion.span
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: 'auto' }}
-              exit={{ opacity: 0, width: 0 }}
-              className="text-sm font-bold text-foreground whitespace-nowrap overflow-hidden"
-            >
-              WasteSense AI
-            </motion.span>
-          )}
+        <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden group">
+          <motion.div
+            whileHover={{ scale: 1.1, rotate: 10 }}
+            whileTap={microInteractions.tapScale}
+            className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0 shadow-2xs"
+          >
+            <Leaf className="size-4.5" />
+          </motion.div>
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: 'auto' }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={springSmooth}
+                className="text-sm font-extrabold text-foreground tracking-tight whitespace-nowrap overflow-hidden"
+              >
+                WasteSense <span className="text-primary font-normal">AI</span>
+              </motion.span>
+            )}
+          </AnimatePresence>
         </Link>
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={toggleCollapse}
-          className="shrink-0 text-muted-foreground hover:text-foreground"
+          className="shrink-0 text-muted-foreground hover:text-foreground rounded-lg"
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {isCollapsed ? <PanelLeft className="size-4" /> : <PanelLeftClose className="size-4" />}
@@ -62,7 +70,7 @@ export function Sidebar() {
         {sidebarMenuGroups.map((group) => (
           <div key={group.title}>
             {!isCollapsed && (
-              <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
                 {group.title}
               </p>
             )}
@@ -76,23 +84,21 @@ export function Sidebar() {
                     href={item.href}
                     title={isCollapsed ? item.label : undefined}
                     className={cn(
-                      'group relative flex items-center rounded-xl text-sm font-medium transition-all',
-                      isCollapsed
-                        ? 'justify-center px-0 py-2.5'
-                        : 'gap-3 px-3 py-2.5',
+                      'group relative flex items-center rounded-xl text-xs sm:text-sm font-medium transition-colors',
+                      isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
                       active
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                        ? 'text-primary font-semibold'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                     )}
                   >
                     {active && (
                       <motion.div
                         layoutId="sidebar-active"
-                        className="absolute inset-0 rounded-xl bg-primary/10"
-                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        className="absolute inset-0 rounded-xl bg-primary/10 border border-primary/15 shadow-2xs"
+                        transition={springSmooth}
                       />
                     )}
-                    <Icon className="size-4 shrink-0 relative z-10" />
+                    <Icon className="size-4 shrink-0 relative z-10 transition-transform group-hover:scale-110" />
                     {!isCollapsed && (
                       <>
                         <span className="relative z-10">{item.label}</span>
@@ -108,9 +114,13 @@ export function Sidebar() {
                             }
                           }
                           return displayBadge ? (
-                            <span className="ml-auto relative z-10 flex size-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                            <motion.span
+                              initial={{ scale: 0.8 }}
+                              animate={{ scale: 1 }}
+                              className="ml-auto relative z-10 flex size-5 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary border border-primary/20"
+                            >
                               {displayBadge}
-                            </span>
+                            </motion.span>
                           ) : null;
                         })()}
                       </>
@@ -127,19 +137,23 @@ export function Sidebar() {
       <div className="border-t border-border/50 px-3 py-3 shrink-0">
         {isCollapsed ? (
           <div className="flex flex-col items-center gap-2">
-            <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title="GitHub">
+            <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-foreground" title="WasteSense AI">
               <GitFork className="size-3.5" />
             </Button>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between px-1 text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-between px-2 text-[10px] font-medium text-muted-foreground/75">
               <span>{TEAM_NAME}</span>
-              <span>{APP_VERSION}</span>
+              <span className="font-mono">{APP_VERSION}</span>
             </div>
-            <Button variant="ghost" size="xs" className="mt-2 w-full justify-start gap-2 text-muted-foreground">
-              <GitFork className="size-3" />
-              <span>GitHub</span>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="mt-2 w-full justify-start gap-2 text-xs text-muted-foreground hover:text-foreground rounded-lg"
+            >
+              <GitFork className="size-3.5" />
+              <span>Version Dashboard</span>
             </Button>
           </>
         )}

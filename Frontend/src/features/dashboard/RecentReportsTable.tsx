@@ -1,9 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Eye, ImageIcon, Loader2, MapPin } from 'lucide-react';
+import { Eye, ImageIcon, MapPin, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableHeader,
@@ -16,12 +15,14 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchDetections, resolveImageUrl } from '@/services/detection';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { cardEntrance, tableRowVariants, containerStaggerFast, microInteractions } from '@/lib/motion';
 
 const statusConfig: Record<string, string> = {
-  pending: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-  completed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-  failed: 'bg-red-500/10 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+  pending: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200/50 dark:border-amber-800/50',
+  completed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/50',
+  failed: 'bg-red-500/10 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/50',
 };
 
 export function RecentReportsTable() {
@@ -30,121 +31,190 @@ export function RecentReportsTable() {
     queryKey: ['recentDetections'],
     queryFn: () => fetchDetections(1, 5), // Fetch top 5
   });
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.3 }}
-      className="glass rounded-2xl overflow-hidden"
+      variants={cardEntrance}
+      initial="hidden"
+      animate="visible"
+      className="glass rounded-3xl overflow-hidden border border-slate-200/70 dark:border-slate-800/70 shadow-sm flex flex-col justify-between"
     >
-      <div className="px-5 py-4 border-b border-border/50">
-        <h2 className="text-base font-semibold text-foreground">Recent Reports</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Latest pollution reports from the field</p>
+      <div className="px-5 sm:px-6 py-4 border-b border-border/50 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-8 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20">
+            <FileSpreadsheet className="size-4" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-foreground tracking-tight">Recent Field Surveys</h2>
+            <p className="text-xs text-muted-foreground">Latest plastic pollution detections ingested into database</p>
+          </div>
+        </div>
+        <Link href="/history">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground group">
+            <span>View all</span>
+            <ChevronRight className="size-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </Button>
+        </Link>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="w-[120px]">Report ID</TableHead>
-            <TableHead className="w-[60px]">Image</TableHead>
-            <TableHead>Objects</TableHead>
-            <TableHead>Categories</TableHead>
-            <TableHead className="hidden md:table-cell">Location</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="hidden lg:table-cell">Date</TableHead>
-            <TableHead className="w-[60px]">Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={8} className="h-32 text-center">
-                <Loader2 className="size-5 animate-spin text-muted-foreground mx-auto" />
-              </TableCell>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b border-border/40">
+              <TableHead className="w-[110px] text-xs font-semibold">Report ID</TableHead>
+              <TableHead className="w-[64px] text-xs font-semibold">Preview</TableHead>
+              <TableHead className="text-xs font-semibold">Detections</TableHead>
+              <TableHead className="text-xs font-semibold">Dominant Materials</TableHead>
+              <TableHead className="hidden md:table-cell text-xs font-semibold">Coordinates</TableHead>
+              <TableHead className="text-xs font-semibold">Status</TableHead>
+              <TableHead className="hidden lg:table-cell text-xs font-semibold">Ingested</TableHead>
+              <TableHead className="w-[50px] text-right text-xs font-semibold">Action</TableHead>
             </TableRow>
-          ) : data?.data.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={8} className="h-32 text-center text-sm text-muted-foreground">
-                No detections found.
-              </TableCell>
-            </TableRow>
-          ) : (
-            data?.data.map((detection) => {
-              // Calculate most prominent waste group or total count
-              const objectCount = detection.items.length;
-
-              return (
-                <TableRow key={detection.id} className="group cursor-pointer hover:bg-muted/30" onClick={() => router.push(`/history/${detection.id}`)}>
-                  <TableCell className="font-mono text-xs font-medium">
-                    {detection.id.split('-')[0]}
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, idx) => (
+                <TableRow key={idx} className="border-b border-border/30">
+                  <TableCell>
+                    <div className="h-4 w-16 rounded bg-muted/60 skeleton-shimmer" />
                   </TableCell>
                   <TableCell>
-                    <div className="flex size-8 items-center justify-center rounded-lg bg-muted/60 overflow-hidden">
-                      {detection.annotated_image_url ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={resolveImageUrl(detection.annotated_image_url)} alt="Thumbnail" className="object-cover size-full" />
-                      ) : (
-                        <ImageIcon className="size-4 text-muted-foreground" />
-                      )}
-                    </div>
+                    <div className="size-9 rounded-xl bg-muted/60 skeleton-shimmer" />
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-sm">{objectCount} Object{objectCount !== 1 && 's'}</span>
-                    </div>
+                    <div className="h-4 w-20 rounded bg-muted/60 skeleton-shimmer" />
                   </TableCell>
                   <TableCell>
-                    {/* Render top 2 categories */}
-                    <div className="flex gap-1 flex-wrap">
-                      {detection.summary && Object.entries(detection.summary)
-                        .filter(([k, v]) => !['total_objects', 'waste_coverage_percent', 'risk_score', 'severity', 'cleanup_priority', 'explanation', 'material_coverage', 'material_counts'].includes(k) && typeof v === 'number')
-                        .slice(0, 2)
-                        .map(([group, count]) => (
-                          <span key={group} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border bg-muted/40 uppercase">
-                            {group} <span className="ml-1 opacity-70">({count as number})</span>
-                          </span>
-                      ))}
-                    </div>
+                    <div className="h-4 w-28 rounded bg-muted/50 skeleton-shimmer" />
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <div className="flex items-center text-xs text-muted-foreground gap-1 mt-1">
-                      <MapPin className="size-3" />
-                      {detection.latitude !== null && detection.longitude !== null
-                        ? `${detection.latitude.toFixed(4)}, ${detection.longitude.toFixed(4)}`
-                        : 'Unknown Location'}
-                    </div>
+                    <div className="h-4 w-24 rounded bg-muted/40 skeleton-shimmer" />
                   </TableCell>
                   <TableCell>
-                    <span className={cn(
-                      'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border capitalize',
-                      statusConfig[detection.detection_status] || statusConfig.pending
-                    )}>
-                      {detection.detection_status}
-                    </span>
+                    <div className="h-5 w-16 rounded-full bg-muted/50 skeleton-shimmer" />
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                    {formatDistanceToNow(new Date(detection.created_at), { addSuffix: true })}
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="h-4 w-16 rounded bg-muted/40 skeleton-shimmer" />
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      aria-label={`View report ${detection.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/history/${detection.id}`);
-                      }}
-                    >
-                      <Eye className="size-3.5" />
-                    </Button>
+                    <div className="size-7 rounded bg-muted/40 skeleton-shimmer" />
                   </TableCell>
                 </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
+              ))
+            ) : data?.data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-32 text-center text-sm text-muted-foreground">
+                  No survey detections recorded yet.
+                </TableCell>
+              </TableRow>
+            ) : (
+              data?.data.map((detection, index) => {
+                const objectCount = detection.items.length;
+
+                return (
+                  <motion.tr
+                    key={detection.id}
+                    variants={tableRowVariants}
+                    initial="hidden"
+                    animate="visible"
+                    transition={{ delay: index * 0.04 }}
+                    onClick={() => router.push(`/history/${detection.id}`)}
+                    className="group cursor-pointer hover:bg-muted/40 dark:hover:bg-slate-800/40 border-b border-border/30 transition-colors"
+                  >
+                    <TableCell className="font-mono text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                      #{detection.id.slice(0, 8)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex size-9 items-center justify-center rounded-xl bg-muted/60 dark:bg-slate-800 overflow-hidden border border-border/50 shadow-2xs">
+                        {detection.annotated_image_url ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={resolveImageUrl(detection.annotated_image_url)}
+                            alt="Survey Preview"
+                            className="object-cover size-full group-hover:scale-110 transition-transform duration-300"
+                          />
+                        ) : (
+                          <ImageIcon className="size-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-semibold text-sm text-foreground">
+                        {objectCount} item{objectCount !== 1 ? 's' : ''}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {detection.summary &&
+                          Object.entries(detection.summary)
+                            .filter(
+                              ([k, v]) =>
+                                ![
+                                  'total_objects',
+                                  'waste_coverage_percent',
+                                  'risk_score',
+                                  'severity',
+                                  'cleanup_priority',
+                                  'explanation',
+                                  'material_coverage',
+                                  'material_counts',
+                                ].includes(k) && typeof v === 'number'
+                            )
+                            .slice(0, 2)
+                            .map(([group, count]) => (
+                              <span
+                                key={group}
+                                className="inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-semibold border border-border/60 bg-muted/50 dark:bg-slate-800/60 uppercase tracking-wide text-foreground/80"
+                              >
+                                {group} <span className="ml-1 opacity-60">({count as number})</span>
+                              </span>
+                            ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex items-center text-xs text-muted-foreground gap-1">
+                        <MapPin className="size-3 text-muted-foreground/70 shrink-0" />
+                        <span className="truncate">
+                          {detection.latitude !== null && detection.longitude !== null
+                            ? `${detection.latitude.toFixed(3)}, ${detection.longitude.toFixed(3)}`
+                            : 'Unknown GPS'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={cn(
+                          'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border capitalize',
+                          statusConfig[detection.detection_status] || statusConfig.pending
+                        )}
+                      >
+                        {detection.detection_status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(detection.created_at), { addSuffix: true })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10 hover:text-primary rounded-lg"
+                        aria-label={`View report ${detection.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/history/${detection.id}`);
+                        }}
+                      >
+                        <Eye className="size-3.5" />
+                      </Button>
+                    </TableCell>
+                  </motion.tr>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </motion.div>
   );
 }

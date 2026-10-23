@@ -1,46 +1,42 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { Sun, Moon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
+import { AnimatedThemeToggler } from '@/registry/magicui/animated-theme-toggler';
 
-export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+export function ThemeToggle({ className }: { className?: string }) {
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const currentTheme = (resolvedTheme || theme || 'dark') as 'light' | 'dark';
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" aria-label="Toggle theme">
-        <Sun className="size-4" />
-      </Button>
+      <div
+        className="size-9 rounded-xl border border-transparent flex items-center justify-center text-muted-foreground opacity-50 cursor-default"
+        aria-hidden="true"
+      >
+        <span className="size-4" />
+      </div>
     );
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label="Toggle theme"
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="relative overflow-hidden"
-    >
-      <Sun
-        className={`size-4 transition-all duration-300 ${
-          theme === 'dark'
-            ? 'rotate-90 scale-0 opacity-0'
-            : 'rotate-0 scale-100 opacity-100'
-        }`}
-      />
-      <Moon
-        className={`absolute size-4 transition-all duration-300 ${
-          theme === 'dark'
-            ? 'rotate-0 scale-100 opacity-100'
-            : '-rotate-90 scale-0 opacity-0'
-        }`}
-      />
-    </Button>
+    <AnimatedThemeToggler
+      theme={currentTheme === 'dark' ? 'dark' : 'light'}
+      onThemeChange={(newTheme) => setTheme(newTheme)}
+      duration={450}
+      variant="circle"
+      className={
+        className ??
+        'size-9 rounded-xl border border-transparent hover:border-border/60 hover:bg-muted/60 flex items-center justify-center text-foreground transition-colors cursor-pointer [&_svg]:size-4'
+      }
+    />
   );
 }
+
+export { AnimatedThemeTogglerDemo } from '@/registry/magicui/animated-theme-toggler';

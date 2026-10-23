@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.api.dependencies import get_db
+from app.core.cache import cache_get, cache_set
 from app.infrastructure.database.models.detection_model import DetectionModel, DetectionItemModel
 from app.infrastructure.database.models.risk_assessment_model import RiskAssessmentModel
 from app.infrastructure.database.models.ngo_model import NGOTeamModel
@@ -15,7 +16,11 @@ router = APIRouter(prefix="/statistics", tags=["Statistics"])
 
 
 @router.get("", summary="Get global statistics")
-async def get_statistics(db: Session = Depends(get_db)):
+def get_statistics(db: Session = Depends(get_db)):
+    cached = cache_get("global_statistics")
+    if cached:
+        return cached
+
     total_detections = db.query(func.count(DetectionModel.id)).scalar() or 0
 
     # Aggregate waste groups
@@ -26,15 +31,22 @@ async def get_statistics(db: Session = Depends(get_db)):
 
     waste_breakdown = {group: count for group, count in groups}
 
-    return {
+    res = {
         "total_detections": total_detections,
         "waste_breakdown": waste_breakdown
     }
+    cache_set("global_statistics", res, ttl_seconds=30)
+    return res
 
 
 @router.get("/dashboard/summary", summary="Dashboard summary")
-async def get_dashboard_summary(db: Session = Depends(get_db)):
-    stats = await get_statistics(db)
+def get_dashboard_summary(db: Session = Depends(get_db)):
+    cached = cache_get("dashboard_summary")
+    if cached:
+        return cached
+
+    stats = get_statistics(db)
+
 
     total_objects = sum(stats["waste_breakdown"].values())
     recyclable_groups = {"plastic", "glass", "metal", "paper", "cardboard"}
@@ -65,7 +77,7 @@ async def get_dashboard_summary(db: Session = Depends(get_db)):
         NGOTeamModel.availability != "unavailable"
     ).scalar() or 0
 
-    return {
+    res = {
         "total_detections": stats["total_detections"],
         "total_objects_detected": total_objects,
         "recyclable_percentage": recyclable_percentage,
@@ -76,10 +88,15 @@ async def get_dashboard_summary(db: Session = Depends(get_db)):
         "completed_cleanups": completed_cleanups,
         "verified_cleanups": verified_cleanups,
     }
+    cache_set("dashboard_summary", res, ttl_seconds=30)
+    return res
 
 
 @router.get("/analytics", summary="Detailed analytics metrics and time series")
-async def get_analytics(db: Session = Depends(get_db)):
+def get_analytics(db: Session = Depends(get_db)):
+    cached = cache_get("dashboard_analytics")
+    if cached:
+        return cached
     # 1. Real time series of detections grouped by date (last 14-30 days)
     detections = db.query(DetectionModel.created_at, DetectionModel.id).order_by(DetectionModel.created_at.asc()).all()
 
@@ -144,7 +161,7 @@ async def get_analytics(db: Session = Depends(get_db)):
             risk_distribution["76-100 (Critical)"] += 1
 
     # 4. Waste composition
-    stats = await get_statistics(db)
+    stats = get_statistics(db)
     total_objects = sum(stats["waste_breakdown"].values()) or 1
     waste_composition = [
         {
@@ -187,17 +204,22 @@ async def get_analytics(db: Session = Depends(get_db)):
         "impact": f"{verified_count} verified",
     })
 
-    return {
+    analytics_res = {
         "time_series": time_series,
         "severity_breakdown": severity_breakdown,
         "risk_distribution": risk_distribution,
         "waste_composition": waste_composition,
         "insights": insights,
     }
+    cache_set("dashboard_analytics", analytics_res, ttl_seconds=30)
+    return analytics_res
 
 
 @router.get("/impact", summary="Measurable environmental impact from real database operations")
-async def get_impact(db: Session = Depends(get_db)):
+def get_impact(db: Session = Depends(get_db)):
+    cached = cache_get("dashboard_impact")
+    if cached:
+        return cached
     total_detections = db.query(func.count(DetectionModel.id)).scalar() or 0
 
     # Waste objects
@@ -243,7 +265,7 @@ async def get_impact(db: Session = Depends(get_db)):
             "percentage": round((count / tot) * 100, 1),
         })
 
-    return {
+    impact_res = {
         "total_detections": total_detections,
         "total_objects_detected": total_objects,
         "high_risk_sites": high_risk_sites,
@@ -253,3 +275,6 @@ async def get_impact(db: Session = Depends(get_db)):
         "active_ngos": active_ngos,
         "category_impact": category_impact,
     }
+    cache_set("dashboard_impact", impact_res, ttl_seconds=30)
+    return impact_res
+

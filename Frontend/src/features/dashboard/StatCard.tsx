@@ -1,10 +1,13 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import type { DashboardStat } from '@/types/dashboard';
 import { cn } from '@/lib/utils';
+import { cardEntrance, microInteractions } from '@/lib/motion';
+import { AnimatedCounter } from '@/components/shared/AnimatedCounter';
 
 interface StatCardProps {
   stat: DashboardStat;
@@ -17,9 +20,14 @@ export function StatCard({ stat, index }: StatCardProps) {
   const isNeutral = stat.trend === 'neutral';
   const TrendIcon = isNeutral ? Minus : isPositive ? TrendingUp : TrendingDown;
 
-  const sparkData = Array.from({ length: 12 }, (_, i) => ({
-    v: Math.floor(stat.value * (0.7 + Math.sin(i * 0.8 + index) * 0.3 + Math.random() * 0.1)),
-  }));
+  const sparkData = useMemo(() => {
+    return Array.from({ length: 14 }, (_, i) => ({
+      v: Math.max(
+        1,
+        Math.floor(stat.value * (0.65 + Math.sin(i * 0.75 + index) * 0.35 + (i / 14) * 0.2))
+      ),
+    }));
+  }, [stat.value, index]);
 
   const trendColor = isNeutral
     ? 'text-muted-foreground'
@@ -28,10 +36,10 @@ export function StatCard({ stat, index }: StatCardProps) {
       : 'text-red-600 dark:text-red-400';
 
   const trendBg = isNeutral
-    ? 'bg-muted/60'
+    ? 'bg-muted/70'
     : isPositive
-      ? 'bg-emerald-500/10'
-      : 'bg-red-500/10';
+      ? 'bg-emerald-500/10 dark:bg-emerald-500/20'
+      : 'bg-red-500/10 dark:bg-red-500/20';
 
   const sparkColor = isNeutral
     ? '#94a3b8'
@@ -41,44 +49,64 @@ export function StatCard({ stat, index }: StatCardProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.04 }}
-      whileHover={{ y: -2, transition: { duration: 0.2 } }}
-      className="group glass rounded-2xl p-4 cursor-default transition-shadow hover:shadow-lg relative overflow-hidden border border-slate-200/50 dark:border-slate-800/50"
+      variants={cardEntrance}
+      initial="hidden"
+      animate="visible"
+      transition={{ delay: index * 0.05 }}
+      whileHover={microInteractions.hoverLift}
+      className="group glass-card rounded-2xl p-4 sm:p-5 cursor-default relative overflow-hidden flex flex-col justify-between"
     >
-      <div className="flex items-start justify-between">
-        
-        <div className={cn('flex size-14 items-center justify-center rounded-xl relative overflow-hidden', stat.color)}>
-          <Icon className={cn('size-7', stat.iconColor)} />
+      {/* Ambient background hover glow */}
+      <div className="absolute -top-12 -right-12 size-28 rounded-full bg-primary/5 group-hover:bg-primary/10 blur-2xl transition-all duration-500 pointer-events-none" />
+
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          {/* Icon with subtle hover pulse */}
+          <motion.div
+            whileHover={{ scale: 1.08 }}
+            className={cn(
+              'flex size-12 sm:size-13 items-center justify-center rounded-2xl relative overflow-hidden transition-transform duration-300 shadow-sm',
+              stat.color
+            )}
+          >
+            <Icon className={cn('size-6 transition-transform group-hover:scale-110 duration-300', stat.iconColor)} />
+          </motion.div>
+
+          {/* Trend badge */}
+          <div
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold border border-transparent group-hover:border-current/10 transition-colors',
+              trendBg,
+              trendColor
+            )}
+          >
+            <TrendIcon className="size-3" />
+            <span>{stat.change === 0 ? '—' : `${Math.abs(stat.change)}%`}</span>
+          </div>
         </div>
 
-        <div
-          className={cn(
-            'flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold mt-1',
-            trendBg,
-            trendColor,
-          )}
-        >
-          <TrendIcon className="size-3" />
-          <span>{stat.change === 0 ? '—' : `${Math.abs(stat.change)}%`}</span>
+        {/* Value and label */}
+        <div className="mt-4">
+          <p className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+            {typeof stat.value === 'number' ? (
+              <AnimatedCounter value={stat.value} duration={850} />
+            ) : (
+              stat.value
+            )}
+          </p>
+          <p className="text-xs font-medium text-muted-foreground mt-1 truncate">
+            {stat.label}
+          </p>
         </div>
       </div>
 
-      <div className="mt-3">
-        <p className="text-2xl font-bold text-foreground tabular-nums">
-          {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
-      </div>
-
-      {/* Sparkline */}
-      <div className="mt-2 h-8 -mx-1">
+      {/* Mini Sparkline Chart */}
+      <div className="mt-3 h-9 -mx-2 -mb-1 opacity-80 group-hover:opacity-100 transition-opacity">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={sparkData}>
+          <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id={`spark-${stat.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={sparkColor} stopOpacity={0.3} />
+                <stop offset="0%" stopColor={sparkColor} stopOpacity={0.35} />
                 <stop offset="100%" stopColor={sparkColor} stopOpacity={0} />
               </linearGradient>
             </defs>
@@ -86,11 +114,11 @@ export function StatCard({ stat, index }: StatCardProps) {
               type="monotone"
               dataKey="v"
               stroke={sparkColor}
-              strokeWidth={1.5}
+              strokeWidth={1.75}
               fill={`url(#spark-${stat.id})`}
               dot={false}
               isAnimationActive={true}
-              animationDuration={800}
+              animationDuration={900}
             />
           </AreaChart>
         </ResponsiveContainer>

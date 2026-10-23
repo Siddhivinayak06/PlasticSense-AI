@@ -13,9 +13,11 @@ from app.api.v1.schemas.detection_schema import (
 )
 from app.application.dto.detection_dto import DetectionCreateDTO
 from app.application.services.detection_service import DetectionService
+from app.core.cache import cache_clear, cache_get, cache_set
 from app.core.logging import logger
 
 router = APIRouter(prefix="/detections", tags=["Detections"])
+
 
 
 def _to_detection_schema(dto) -> DetectionSchema:
@@ -85,6 +87,7 @@ async def create_detection(
             file_bytes=file_bytes,
         )
         result = service.create_detection(dto)
+        cache_clear()
         return _to_detection_schema(result)
     except ValueError as err:
         logger.error(f"Detection creation failed: {err}")
@@ -123,6 +126,7 @@ async def create_batch_detection(
             logger.error(f"Failed to process {upload_file.filename} in batch: {e}")
             continue
 
+    cache_clear()
     return BatchDetectResponseSchema(results=results)
 
 
@@ -131,7 +135,7 @@ async def create_batch_detection(
     response_model=PaginatedDetectionEnvelope,
     summary="List detections with pagination",
 )
-async def list_detections(
+def list_detections(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     service: DetectionService = Depends(get_detection_service),
@@ -181,12 +185,18 @@ class HotspotsEnvelope(BaseModel):
     response_model=MapDetectionEnvelope,
     summary="Get detections with valid coordinates for map visualization",
 )
-async def get_map_detections(
+def get_map_detections(
     service: DetectionService = Depends(get_detection_service),
 ):
+    cached = cache_get("map_detections")
+    if cached:
+        return cached
+
     items = service.list_map_detections()
     schema_items = [_to_detection_schema(item) for item in items]
-    return MapDetectionEnvelope(detections=schema_items)
+    res = MapDetectionEnvelope(detections=schema_items)
+    cache_set("map_detections", res, ttl_seconds=30)
+    return res
 
 
 @router.get(
@@ -194,12 +204,19 @@ async def get_map_detections(
     response_model=HotspotsEnvelope,
     summary="Get dynamically clustered pollution hotspots from real detections",
 )
-async def get_hotspots(
+def get_hotspots(
     service: DetectionService = Depends(get_detection_service),
 ):
+    cached = cache_get("clustered_hotspots")
+    if cached:
+        return cached
+
     items = service.list_map_detections()
     if not items:
-        return HotspotsEnvelope(hotspots=[], total_hotspots=0)
+        res = HotspotsEnvelope(hotspots=[], total_hotspots=0)
+        cache_set("clustered_hotspots", res, ttl_seconds=30)
+        return res
+
 
     # Spatial clustering (group within ~0.025 degrees ≈ 2.5 km)
     clusters = []
@@ -289,7 +306,9 @@ async def get_hotspots(
         ))
 
     hotspot_list.sort(key=lambda h: h.max_risk_score, reverse=True)
-    return HotspotsEnvelope(hotspots=hotspot_list, total_hotspots=len(hotspot_list))
+    res = HotspotsEnvelope(hotspots=hotspot_list, total_hotspots=len(hotspot_list))
+    cache_set("clustered_hotspots", res, ttl_seconds=30)
+    return res
 
 
 @router.get(
@@ -297,7 +316,7 @@ async def get_hotspots(
     response_model=SingleDetectionEnvelope,
     summary="Get single detection record",
 )
-async def get_detection(
+def get_detection(
     detection_id: str,
     service: DetectionService = Depends(get_detection_service),
 ):
@@ -306,3 +325,4 @@ async def get_detection(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Detection '{detection_id}' not found")
     schema_data = _to_detection_schema(item)
     return SingleDetectionEnvelope(data=schema_data, meta=None, error=None)
+

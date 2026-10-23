@@ -68,17 +68,75 @@ class FeatureEngine:
         image_shape: Optional[tuple] = None,
     ) -> StructuredVisualFeatures:
         """Extract unified visual features from detector and segmenter predictions."""
-        # 1. Waste Coverage from Model 2 (TACO Segmenter)
+        # 1. Waste Coverage — Hybrid approach
+        # The segmenter produces pixel-precise masks (tight outlines around objects),
+        # while the detector produces bounding boxes (rectangle enclosing the object).
+        # Segmenter masks alone vastly undercount coverage because they tightly hug the
+        # object edges. Combining both gives a realistic area-of-impact estimate.
         coverage_pct = 0.0
         material_cov: Dict[str, float] = {}
         material_cnts: Dict[str, int] = {}
         segmented_count = 0
 
+        seg_coverage_pct = 0.0
         if segmenter_result is not None:
-            coverage_pct = round(float(segmenter_result.waste_coverage_percent), 2)
+            seg_coverage_pct = round(float(segmenter_result.waste_coverage_percent), 2)
             material_cov = {k.lower(): round(float(v), 2) for k, v in segmenter_result.material_coverage.items()}
             material_cnts = {k.lower(): int(v) for k, v in segmenter_result.material_counts.items()}
             segmented_count = int(segmenter_result.total_masks)
+
+        # Compute detector bounding box coverage if we have image dimensions
+        det_bbox_coverage_pct = 0.0
+        if detector_result is not None and detector_result.items:
+            # Determine image dimensions for coverage calculation
+            img_h, img_w = 0, 0
+            if image_shape and len(image_shape) >= 2:
+                img_h, img_w = image_shape[0], image_shape[1]
+            elif segmenter_result is not None and segmenter_result.combined_mask is not None:
+                img_h, img_w = segmenter_result.combined_mask.shape[:2]
+            else:
+                # Estimate image dimensions from bounding box coordinates
+                max_x = max(it.bbox_x + it.bbox_w for it in detector_result.items)
+                max_y = max(it.bbox_y + it.bbox_h for it in detector_result.items)
+                img_w = int(max_x * 1.05)  # small margin
+                img_h = int(max_y * 1.05)
+
+            if img_h > 0 and img_w > 0:
+                total_pixels = img_h * img_w
+                try:
+                    import numpy as np
+                    # Build union of all detector bounding boxes
+                    bbox_union = np.zeros((img_h, img_w), dtype=np.uint8)
+                    for item in detector_result.items:
+                        x1 = max(0, int(item.bbox_x))
+                        y1 = max(0, int(item.bbox_y))
+                        x2 = min(img_w, int(item.bbox_x + item.bbox_w))
+                        y2 = min(img_h, int(item.bbox_y + item.bbox_h))
+                        if x2 > x1 and y2 > y1:
+                            bbox_union[y1:y2, x1:x2] = 1
+
+                    # If segmenter mask exists, compute hybrid union
+                    if segmenter_result is not None and segmenter_result.combined_mask is not None:
+                        import cv2
+                        seg_mask = segmenter_result.combined_mask
+                        if seg_mask.shape != (img_h, img_w):
+                            seg_mask = cv2.resize(seg_mask, (img_w, img_h), interpolation=cv2.INTER_NEAREST)
+                        hybrid_mask = np.bitwise_or(bbox_union, (seg_mask > 0).astype(np.uint8))
+                        hybrid_pixels = int(hybrid_mask.sum())
+                        coverage_pct = max(seg_coverage_pct, round((hybrid_pixels / total_pixels) * 100, 2))
+                    elif segmenter_result is None:
+                        det_bbox_pixels = int(bbox_union.sum())
+                        det_bbox_coverage_pct = round((det_bbox_pixels / total_pixels) * 100, 2)
+                        coverage_pct = det_bbox_coverage_pct
+                    else:
+                        coverage_pct = seg_coverage_pct
+                except Exception:
+                    # Fall back to segmenter-only coverage on any numpy error
+                    coverage_pct = seg_coverage_pct
+
+        # If no detector items or coverage_pct still 0, fall back to segmenter-only coverage
+        if coverage_pct == 0.0:
+            coverage_pct = seg_coverage_pct
 
         # 2. Fine-grained detections from Model 1 (WasteSense Detector)
         obj_count = 0
@@ -112,6 +170,13 @@ class FeatureEngine:
                 group_counts[grp] = group_counts.get(grp, 0) + 1
             for grp, cnt in group_counts.items():
                 material_props[grp] = round((cnt / obj_count) * 100.0, 1)
+
+        # If hybrid coverage expanded beyond raw segmenter coverage, scale material_cov proportionally
+        if coverage_pct > seg_coverage_pct and material_props:
+            material_cov = {
+                mat: round((prop / 100.0) * coverage_pct, 2)
+                for mat, prop in material_props.items()
+            }
 
         # 5. Extract Hazard Indicators (Strictly from real model classes)
         # Cigarette count

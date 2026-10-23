@@ -1,5 +1,6 @@
 "use client";
-import { Suspense, useRef } from "react";
+
+import { Suspense, useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { Canvas } from "@react-three/fiber";
@@ -19,9 +20,8 @@ import {
   ScanLine,
   Leaf,
   ChevronRight,
-  Sun,
-  Moon,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 /* ─── Animated counter ─── */
 function Counter({ value, suffix = "" }: { value: number; suffix?: string }) {
@@ -49,7 +49,7 @@ function FadeIn({
 }) {
   const yOffset = direction === "up" ? 40 : 0;
   const xOffset = direction === "left" ? -40 : direction === "right" ? 40 : 0;
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, y: yOffset, x: xOffset }}
@@ -63,34 +63,24 @@ function FadeIn({
   );
 }
 
-/* ─── Theme toggle ─── */
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  return (
-    <button
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
-      aria-label="Toggle theme"
-    >
-      <Sun className="w-4 h-4 hidden dark:block" />
-      <Moon className="w-4 h-4 block dark:hidden" />
-    </button>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════ */
-
 export default function LandingPage() {
   const { scrollY } = useScroll();
-  const heroY = useTransform(scrollY, [0, 1000], [0, 300]);
-  const heroOpacity = useTransform(scrollY, [0, 500], [1, 0]);
-  const globeY = useTransform(scrollY, [0, 1000], [0, 150]);
+  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
+
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isLightMode = mounted ? resolvedTheme === "light" : false;
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#020617] text-slate-900 dark:text-slate-50 overflow-x-hidden selection:bg-emerald-500/30 transition-colors duration-500">
       {/* ───── Floating Navbar ───── */}
       <nav className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 py-4">
-        <motion.div 
+        <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
@@ -105,9 +95,24 @@ export default function LandingPage() {
             </span>
           </Link>
           <div className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-500 dark:text-slate-400">
-            <a href="#features" className="hover:text-slate-900 dark:hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-emerald-500 after:transition-all hover:after:w-full">Features</a>
-            <a href="#technology" className="hover:text-slate-900 dark:hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-emerald-500 after:transition-all hover:after:w-full">Technology</a>
-            <a href="#impact" className="hover:text-slate-900 dark:hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-emerald-500 after:transition-all hover:after:w-full">Impact</a>
+            <a
+              href="#features"
+              className="hover:text-slate-900 dark:hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-emerald-500 after:transition-all hover:after:w-full"
+            >
+              Features
+            </a>
+            <a
+              href="#technology"
+              className="hover:text-slate-900 dark:hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-emerald-500 after:transition-all hover:after:w-full"
+            >
+              Technology
+            </a>
+            <a
+              href="#impact"
+              className="hover:text-slate-900 dark:hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-emerald-500 after:transition-all hover:after:w-full"
+            >
+              Impact
+            </a>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
             <ThemeToggle />
@@ -127,21 +132,21 @@ export default function LandingPage() {
       <section className="relative min-h-[100svh] flex items-center overflow-hidden">
         {/* Background gradient orbs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div 
+          <motion.div
             animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
             transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-1/4 -left-32 w-[500px] h-[500px] bg-emerald-500/10 dark:bg-emerald-500/20 rounded-full blur-[120px]" 
+            className="absolute top-1/4 -left-32 w-[500px] h-[500px] bg-emerald-500/10 dark:bg-emerald-500/20 rounded-full blur-[120px]"
           />
-          <motion.div 
+          <motion.div
             animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
             transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute bottom-1/4 -right-32 w-[600px] h-[600px] bg-cyan-500/10 dark:bg-cyan-500/20 rounded-full blur-[150px]" 
+            className="absolute bottom-1/4 -right-32 w-[600px] h-[600px] bg-cyan-500/10 dark:bg-cyan-500/20 rounded-full blur-[150px]"
           />
         </div>
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-8 pt-32 pb-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Left – Copy */}
-          <motion.div style={{ y: heroY, opacity: heroOpacity }}>
+          <motion.div style={{ opacity: heroOpacity }}>
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -222,23 +227,23 @@ export default function LandingPage() {
             </motion.div>
           </motion.div>
 
-          {/* Right – 3D Globe */}
-          <motion.div
-            style={{ y: globeY }}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1.2, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          {/* Right – 3D Globe (Steady & Stationary) */}
+          <div
             className="relative h-[500px] lg:h-[650px] xl:h-[700px] w-full cursor-grab active:cursor-grabbing flex items-center justify-center lg:justify-end"
           >
             <div className="relative w-full max-w-[800px] aspect-square">
               <Canvas
                 camera={{ position: [-0.5, 0, 5.5], fov: 45 }}
                 dpr={[1, 2]}
-                gl={{ antialias: true, toneMapping: 3, toneMappingExposure: 1.2 }}
+                gl={{
+                  antialias: true,
+                  toneMapping: 3,
+                  toneMappingExposure: isLightMode ? 1.6 : 1.25,
+                }}
                 className="w-full h-full"
               >
                 <Suspense fallback={null}>
-                  <InteractiveGlobe />
+                  <InteractiveGlobe isLightMode={isLightMode} />
                   <OrbitControls
                     enableZoom={false}
                     enablePan={false}
@@ -248,10 +253,10 @@ export default function LandingPage() {
                   />
                 </Suspense>
               </Canvas>
-              {/* Soft vignette – gently fades the extreme edges into the background */}
-              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_65%,#ffffff_100%)] dark:bg-[radial-gradient(circle_at_center,rgba(2,6,23,0)_65%,#020617_100%)] transition-colors duration-500" />
+              {/* Soft subtle vignette */}
+              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_72%,#ffffff_100%)] dark:bg-[radial-gradient(circle_at_center,rgba(2,6,23,0)_72%,#020617_100%)] transition-colors duration-500" />
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Scroll indicator */}
@@ -259,7 +264,7 @@ export default function LandingPage() {
           style={{ opacity: heroOpacity }}
           animate={{ y: [0, 8, 0] }}
           transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-slate-400 dark:text-slate-500 text-xs font-semibold tracking-widest uppercase"
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-slate-400 dark:text-slate-500 text-xs font-semibold tracking-widest uppercase pointer-events-none"
         >
           <span>Scroll to explore</span>
           <ChevronRight className="w-4 h-4 rotate-90 opacity-50" />
@@ -267,7 +272,7 @@ export default function LandingPage() {
       </section>
 
       {/* ───── FEATURES BENTO GRID ───── */}
-      <section id="features" className="relative py-32 px-6 lg:px-8">
+      <section id="features" className="relative py-32 px-6 lg:px-8 border-t border-slate-200 dark:border-slate-800/40">
         <div className="max-w-7xl mx-auto">
           <FadeIn className="text-center mb-20">
             <p className="text-emerald-600 dark:text-emerald-400 font-semibold text-sm tracking-widest uppercase mb-4">
@@ -412,9 +417,7 @@ export default function LandingPage() {
           {/* 3D Scanner */}
           <FadeIn>
             <div className="relative h-[520px] rounded-3xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/60 overflow-hidden group">
-              {/* Animated background gradient */}
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-100/40 dark:from-cyan-900/15 via-slate-100 dark:via-slate-950 to-slate-100 dark:to-slate-950 transition-all duration-700 group-hover:from-emerald-100/50 dark:group-hover:from-emerald-900/20" />
-              {/* Grid pattern */}
               <div
                 className="absolute inset-0 opacity-[0.04] dark:opacity-[0.03]"
                 style={{
@@ -464,7 +467,7 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="flex items-start gap-5">
-                <div className="p-3 bg-cyan-100 dark:bg-cyan-500/10 rounded-2xl text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/20 shrink-0">
+                <div className="p-3 bg-cyan-100 dark:cyan-500/10 rounded-2xl text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/20 shrink-0">
                   <MapPin className="w-6 h-6" />
                 </div>
                 <div>
@@ -546,13 +549,21 @@ export default function LandingPage() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center">
               <Leaf className="w-4 h-4 text-white dark:text-slate-950" />
             </div>
-            <span>WasteSense AI &copy; 2026</span>
+            <span>PlasticSense AI &copy; 2026</span>
           </div>
           <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="hover:text-slate-900 dark:hover:text-white transition-colors">Dashboard</Link>
-            <Link href="/map" className="hover:text-slate-900 dark:hover:text-white transition-colors">Map</Link>
-            <Link href="/analytics" className="hover:text-slate-900 dark:hover:text-white transition-colors">Analytics</Link>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 dark:hover:text-white transition-colors">GitHub</a>
+            <Link href="/dashboard" className="hover:text-slate-900 dark:hover:text-white transition-colors">
+              Dashboard
+            </Link>
+            <Link href="/map" className="hover:text-slate-900 dark:hover:text-white transition-colors">
+              Map
+            </Link>
+            <Link href="/analytics" className="hover:text-slate-900 dark:hover:text-white transition-colors">
+              Analytics
+            </Link>
+            <Link href="/detect" className="hover:text-slate-900 dark:hover:text-white transition-colors">
+              Detector
+            </Link>
           </div>
         </div>
       </footer>

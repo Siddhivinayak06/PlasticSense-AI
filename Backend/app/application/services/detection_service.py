@@ -133,8 +133,9 @@ class DetectionService:
         detection = self.repository.get_by_id(detection_id)
         if not detection:
             return None
-        # Retrieve associated risk assessment from database
-        assessment = self.risk_service.get_for_detection(detection_id)
+        assessment = getattr(detection, "risk_assessment", None)
+        if not assessment and self.risk_service:
+            assessment = self.risk_service.get_for_detection(detection_id)
         return self._to_dto(detection, assessment=assessment)
 
     def list_detections(self, page: int = 1, limit: int = 10) -> Tuple[List[DetectionResponseDTO], int]:
@@ -146,7 +147,7 @@ class DetectionService:
         items, total = self.repository.get_all(skip=skip, limit=limit)
         dtos = []
         for d in items:
-            assessment = self.risk_service.get_for_detection(d.id) if self.risk_service else None
+            assessment = getattr(d, "risk_assessment", None)
             dtos.append(self._to_dto(d, assessment=assessment))
         return dtos, total
 
@@ -154,9 +155,10 @@ class DetectionService:
         items = self.repository.list_map_detections()
         dtos = []
         for d in items:
-            assessment = self.risk_service.get_for_detection(d.id) if self.risk_service else None
+            assessment = getattr(d, "risk_assessment", None)
             dtos.append(self._to_dto(d, assessment=assessment))
         return dtos
+
 
     def _to_dto(
         self,

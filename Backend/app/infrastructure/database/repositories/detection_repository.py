@@ -1,8 +1,10 @@
 from typing import List, Optional, Tuple
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
 from app.application.interfaces.i_detection_repository import IDetectionRepository
 from app.domain.entities.detection import Detection, DetectionItem
 from app.domain.entities.location import Location
+from app.domain.entities.risk_assessment import RiskAssessment
 from app.infrastructure.database.models.detection_model import DetectionModel, DetectionItemModel
 
 
@@ -25,6 +27,18 @@ class DetectionRepository(IDetectionRepository):
             )
             for item in model.items
         ]
+        assessment = None
+        if getattr(model, "risk_assessment", None):
+            ra = model.risk_assessment
+            assessment = RiskAssessment(
+                id=ra.id,
+                detection_id=ra.detection_id,
+                score=ra.score,
+                level=ra.level,
+                strategy_breakdown=ra.strategy_breakdown,
+                computed_at=ra.computed_at,
+            )
+
         return Detection(
             id=model.id,
             location=Location(latitude=model.latitude, longitude=model.longitude) if model.latitude is not None and model.longitude is not None else None,
@@ -37,8 +51,10 @@ class DetectionRepository(IDetectionRepository):
             detection_status=model.detection_status,
             failure_reason=model.failure_reason,
             items=items,
+            risk_assessment=assessment,
             created_at=model.created_at,
         )
+
 
     def save(self, detection: Detection) -> Detection:
         model = DetectionModel(
@@ -115,15 +131,27 @@ class DetectionRepository(IDetectionRepository):
         return self._to_domain(model)
 
     def get_by_id(self, detection_id: str) -> Optional[Detection]:
-        model = self.db.query(DetectionModel).filter(DetectionModel.id == detection_id).first()
+        model = (
+            self.db.query(DetectionModel)
+            .options(
+                selectinload(DetectionModel.items),
+                selectinload(DetectionModel.risk_assessment),
+            )
+            .filter(DetectionModel.id == detection_id)
+            .first()
+        )
         if not model:
             return None
         return self._to_domain(model)
 
     def get_all(self, skip: int = 0, limit: int = 10) -> Tuple[List[Detection], int]:
-        total = self.db.query(DetectionModel).count()
+        total = self.db.query(func.count(DetectionModel.id)).scalar() or 0
         models = (
             self.db.query(DetectionModel)
+            .options(
+                selectinload(DetectionModel.items),
+                selectinload(DetectionModel.risk_assessment),
+            )
             .order_by(DetectionModel.created_at.desc())
             .offset(skip)
             .limit(limit)
@@ -135,10 +163,15 @@ class DetectionRepository(IDetectionRepository):
     def list_map_detections(self) -> List[Detection]:
         models = (
             self.db.query(DetectionModel)
+            .options(
+                selectinload(DetectionModel.items),
+                selectinload(DetectionModel.risk_assessment),
+            )
             .filter(DetectionModel.latitude.isnot(None))
             .filter(DetectionModel.longitude.isnot(None))
             .order_by(DetectionModel.created_at.desc())
-            .limit(1000)
+            .limit(500)
             .all()
         )
         return [self._to_domain(m) for m in models]
+

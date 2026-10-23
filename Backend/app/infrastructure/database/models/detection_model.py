@@ -15,7 +15,7 @@ class DetectionModel(Base):
     longitude = Column(Float, nullable=True)
     location_source = Column(String(50), nullable=True)
     location_confidence = Column(Float, nullable=True)
-    model_version = Column(String(64), nullable=False, default="v1.0")
+    model_version = Column(String(128), nullable=False, default="v1.0")
     detection_status = Column(String(32), nullable=False, default="pending")
     failure_reason = Column(String(512), nullable=True)
     processing_time_ms = Column(Float, nullable=True)

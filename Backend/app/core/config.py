@@ -36,20 +36,21 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 10
 
     # Dual Model Pipeline paths
-    DETECTOR_MODEL_PATH: str = "best.pt"
-    SEGMENTER_MODEL_PATH: str = "best1.pt"
-    ARCHIVE_MODEL_PATH: str = "best.pt"
-    MODEL_WEIGHTS_PATH: str = "best.pt"  # Legacy backwards compatibility
+    DETECTOR_MODEL_PATH: str = "wastesense_detector_best.pt"
+    SEGMENTER_MODEL_PATH: str = "taco_segmentation_best.pt"
+    PLASTIC_CLASSIFIER_PATH: str = "old_models/plastic_classifier_best.pt"
+    ARCHIVE_MODEL_PATH: str = "wastesense_detector_best.pt"
+    MODEL_WEIGHTS_PATH: str = "wastesense_detector_best.pt"  # Legacy backwards compatibility
 
     # Model inference parameters
-    DETECTOR_CONF_THRESHOLD: float = 0.10
-    SEGMENTER_CONF_THRESHOLD: float = 0.20
+    DETECTOR_CONF_THRESHOLD: float = 0.06
+    SEGMENTER_CONF_THRESHOLD: float = 0.15
     DETECTOR_IOU_THRESHOLD: float = 0.45
     SEGMENTER_IOU_THRESHOLD: float = 0.50
-    CONFIDENCE_THRESHOLD: float = 0.25  # Legacy backwards compatibility
-    IOU_THRESHOLD: float = 0.50  # Legacy backwards compatibility
+    CONFIDENCE_THRESHOLD: float = 0.06  # Legacy backwards compatibility
+    IOU_THRESHOLD: float = 0.45  # Legacy backwards compatibility
     IMAGE_SIZE: int = 960
-    INFERENCE_DEVICE: str = "auto"  # 'auto', 'cuda', 'cpu'
+    INFERENCE_DEVICE: str = "auto"  # 'auto', 'cuda', 'mps', 'cpu'
 
     # ── Risk Engine Parameters (Phase 5) ──────────────────────────────────────
     RISK_WEIGHT_COVERAGE: float = 0.35
@@ -79,7 +80,14 @@ class Settings(BaseSettings):
                 url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
             elif url.startswith("postgresql+psycopg://"):
                 url = url.replace("postgresql+psycopg://", "postgresql+psycopg2://", 1)
+
+            # Ensure sslmode=require for Supabase cloud connections
+            if "supabase.com" in url or "supabase.co" in url:
+                if "sslmode" not in url:
+                    sep = "&" if "?" in url else "?"
+                    url = f"{url}{sep}sslmode=require"
             return url
+
         # Fallback: build URL from individual vars
         if not self.POSTGRES_PASSWORD:
             raise RuntimeError(
@@ -147,3 +155,17 @@ def resolve_model_path(target_path: str) -> str:
         return str(cand5.resolve())
 
     return str(p)
+
+
+def resolve_inference_device(preferred: Optional[str] = None) -> str:
+    """Resolve the optimal device for PyTorch / YOLO inference (CUDA, Apple Silicon MPS, or CPU)."""
+    import torch
+    target = preferred or settings.INFERENCE_DEVICE
+    if not target or target.lower() == "auto":
+        if torch.cuda.is_available():
+            return "cuda:0"
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+    return target
+
