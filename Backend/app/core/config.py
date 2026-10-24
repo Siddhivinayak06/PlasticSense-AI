@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: Optional[str] = None
     POSTGRES_DB: str = "wastesense_db"
     DATABASE_URL: Optional[str] = None
+    # Set true to always use the local SQLite file, ignoring DATABASE_URL.
+    # When false, an unreachable DATABASE_URL falls back to SQLite automatically.
+    DB_FORCE_SQLITE: bool = False
     SUPABASE_URL: Optional[str] = None
     SUPABASE_KEY: Optional[str] = None
     SUPABASE_BUCKET_NAME: str = "images"
@@ -35,19 +38,26 @@ class Settings(BaseSettings):
     RESULTS_DIR: str = "media/results"
     MAX_UPLOAD_SIZE_MB: int = 10
 
-    # Dual Model Pipeline paths
-    DETECTOR_MODEL_PATH: str = "wastesense_detector_best.pt"
+    # ── Model pipeline paths ──────────────────────────────────────────────────
+    # Model selection rationale and evidence: docs/MODEL_SELECTION.md
+    # Detector  = 22-class YOLOv8n ("best.pt"). Chosen over plasticsense_detector_best.pt,
+    #             which produced only 5 detections across 31 target-domain images even at
+    #             its native 960px, vs 103 for this one.
+    # Segmenter = YOLO11s-seg TACO 5-material model, run at its native 960px.
+    DETECTOR_MODEL_PATH: str = "best.pt"
     SEGMENTER_MODEL_PATH: str = "taco_segmentation_best.pt"
-    PLASTIC_CLASSIFIER_PATH: str = "old_models/plastic_classifier_best.pt"
-    ARCHIVE_MODEL_PATH: str = "wastesense_detector_best.pt"
-    MODEL_WEIGHTS_PATH: str = "wastesense_detector_best.pt"  # Legacy backwards compatibility
+    ARCHIVE_MODEL_PATH: str = "best.pt"
+    MODEL_WEIGHTS_PATH: str = "best.pt"  # Legacy backwards compatibility
 
     # Model inference parameters
-    DETECTOR_CONF_THRESHOLD: float = 0.06
-    SEGMENTER_CONF_THRESHOLD: float = 0.15
+    # 0.25 is the Ultralytics default. The previous 0.06/0.10 values were compensating
+    # for a detector that barely fired on this domain; with the detector swapped they
+    # only manufacture false positives.
+    DETECTOR_CONF_THRESHOLD: float = 0.25
+    SEGMENTER_CONF_THRESHOLD: float = 0.25
     DETECTOR_IOU_THRESHOLD: float = 0.45
     SEGMENTER_IOU_THRESHOLD: float = 0.50
-    CONFIDENCE_THRESHOLD: float = 0.06  # Legacy backwards compatibility
+    CONFIDENCE_THRESHOLD: float = 0.25  # Legacy backwards compatibility
     IOU_THRESHOLD: float = 0.45  # Legacy backwards compatibility
     IMAGE_SIZE: int = 960
     INFERENCE_DEVICE: str = "auto"  # 'auto', 'cuda', 'mps', 'cpu'

@@ -26,6 +26,7 @@ class DetectionSchema(BaseModel):
     longitude: Optional[float] = None
     location_source: Optional[str] = None
     location_confidence: Optional[float] = None
+    captured_at: Optional[str] = None
     model_version: str
     detection_status: str
     failure_reason: Optional[str] = None

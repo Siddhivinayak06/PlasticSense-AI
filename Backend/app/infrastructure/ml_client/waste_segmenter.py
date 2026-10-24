@@ -15,6 +15,7 @@ from app.application.interfaces.i_waste_segmenter import (
     SegmenterPrediction,
 )
 from app.core.config import resolve_inference_device, resolve_model_path, settings
+from app.infrastructure.ml_client.model_introspect import describe
 
 logger = logging.getLogger("WasteSense_AI")
 
@@ -63,6 +64,12 @@ class WasteSegmenter(IWasteSegmenter):
                 self.model_name = "YOLO11-seg"
             else:
                 self.model_name = base[:20]
+
+            info = describe(self.model)
+            self.architecture = info["architecture"]
+            self.param_count = info["param_count"]
+            self.provenance = info["provenance"]
+
             logger.info(
                 f"Waste Segmenter loaded successfully. Classes ({len(self.class_names)}): {list(self.class_names.values())}"
             )

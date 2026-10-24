@@ -52,9 +52,24 @@ class _UnavailableMLClient:
         raise MLClientError("ML service unavailable: connection refused")
 
 
+def _real_jpeg_bytes() -> bytes:
+    """A genuinely decodable JPEG.
+
+    DetectionService now verifies that uploaded bytes actually decode as an image,
+    so a placeholder like b"image" is correctly rejected before inference.
+    """
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (32, 32), (120, 120, 120)).save(buf, format="JPEG")
+    return buf.getvalue()
+
+
 class DetectionServiceTests(unittest.TestCase):
     def _dto(self):
-        return DetectionCreateDTO(12.9, 77.5, "image.jpg", "image/jpeg", b"image")
+        return DetectionCreateDTO(12.9, 77.5, "image.jpg", "image/jpeg", _real_jpeg_bytes())
 
     def _service(self, ml_client, repository, directory):
         return DetectionService(repository, ml_client, RiskService(_RiskRepository()), LocalStorageClient(directory))

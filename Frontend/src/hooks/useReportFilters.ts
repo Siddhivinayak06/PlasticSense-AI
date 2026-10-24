@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
-import { mockFullReports } from '@/mock/reports';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { fetchDetections } from '@/services/detection';
+import { detectionsToReports } from '@/services/reportAdapter';
 import type {
   Report,
   ReportFilters,
@@ -29,6 +30,35 @@ export function useReportFilters() {
   const [sort, setSort] = useState<ReportSortOption>('newest');
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Real detections from the backend. Filtering and sorting stay client-side
+  // because the volume is small; this hook previously operated on mock data.
+  const [sourceReports, setSourceReports] = useState<Report[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // Large page so client-side filters operate over the whole history.
+        const res = await fetchDetections(1, 500);
+        if (!cancelled) setSourceReports(detectionsToReports(res.data ?? []));
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load reports');
+          setSourceReports([]);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ─── Search ─────────────────────────────────────────────
   const setSearch = useCallback((search: string) => {
@@ -105,7 +135,7 @@ export function useReportFilters() {
 
   // ─── Filter + Sort + Paginate ───────────────────────────
   const filteredReports = useMemo(() => {
-    let result = [...mockFullReports];
+    let result = [...sourceReports];
 
     // Search
     if (filters.search) {
@@ -178,7 +208,7 @@ export function useReportFilters() {
     });
 
     return result;
-  }, [filters, sort]);
+  }, [filters, sort, sourceReports]);
 
   // ─── Pagination ─────────────────────────────────────────
   const totalCount = filteredReports.length;
@@ -200,6 +230,8 @@ export function useReportFilters() {
     reports: paginatedReports,
     allFilteredReports: filteredReports,
     totalCount,
+    isLoading,
+    error,
 
     // Filters
     filters,

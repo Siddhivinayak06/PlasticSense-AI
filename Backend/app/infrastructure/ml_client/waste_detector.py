@@ -18,7 +18,7 @@ from app.application.interfaces.i_waste_detector import (
 )
 from app.core.config import resolve_inference_device, resolve_model_path, settings
 from app.domain.entities.detection import DetectionItem
-from app.infrastructure.ml_client.plastic_classifier import PlasticClassifier
+from app.infrastructure.ml_client.model_introspect import describe
 
 logger = logging.getLogger("WasteSense_AI")
 
@@ -57,40 +57,6 @@ class WasteDetector(IWasteDetector):
             return flattened
 
         return names
-
-    @staticmethod
-    def _map_plastic_item_form(resin_code: str, bbox_w: float, bbox_h: float) -> str:
-        """Map plastic resin code and physical bounding box dimensions into combined item label."""
-        area = bbox_w * bbox_h
-        aspect_ratio = max(bbox_w, bbox_h) / max(min(bbox_w, bbox_h), 1.0)
-
-        # 1. Very small compact boxes are typically bottle caps or drink lids
-        if (bbox_w <= 45 and bbox_h <= 45) or (area <= 2200 and aspect_ratio <= 1.8):
-            if resin_code in ("HDPE", "PP", "Other", "unknown"):
-                return f"Cap & Lid ({resin_code})" if resin_code != "unknown" else "Cap & Lid"
-
-        # 2. Resin-specific primary form mapping
-        if resin_code == "PET":
-            return f"Bottle ({resin_code})"
-        elif resin_code == "LDPE":
-            return f"Plastic Bag ({resin_code})"
-        elif resin_code == "Other":
-            return f"Wrapper & Film ({resin_code})"
-        elif resin_code == "PS":
-            return f"Cup & Container ({resin_code})"
-        elif resin_code == "PP":
-            if aspect_ratio >= 1.6 and bbox_w > bbox_h:
-                return f"Tub & Tray ({resin_code})"
-            return f"Cup & Container ({resin_code})"
-        elif resin_code == "HDPE":
-            if area <= 3500 and aspect_ratio <= 1.6:
-                return f"Cap & Lid ({resin_code})"
-            elif aspect_ratio >= 1.8 and bbox_w > bbox_h:
-                return f"Tub & Tray ({resin_code})"
-            else:
-                return f"Bottle ({resin_code})"
-
-        return f"Plastic ({resin_code})" if resin_code != "unknown" else "Plastic"
 
     def __init__(
         self,
@@ -141,12 +107,15 @@ class WasteDetector(IWasteDetector):
             else:
                 self.model_name = base[:20]
 
-            # Load Stage 2: Plastic Resin Classifier
-            try:
-                self.plastic_classifier = PlasticClassifier(device=self.device)
-            except Exception as e:
-                logger.warning(f"Could not load PlasticClassifier: {e}")
-                self.plastic_classifier = None
+            info = describe(self.model)
+            self.architecture = info["architecture"]
+            self.param_count = info["param_count"]
+            self.provenance = info["provenance"]
+
+            # "best.pt" is the Ultralytics default filename and says nothing useful,
+            # so name the model after what it actually is.
+            if base.lower() in {"best", "last", "weights", "model"}:
+                self.model_name = f"{self.architecture}-{len(self.class_names)}cls"
 
             logger.info(
                 f"Waste Detector loaded successfully. Classes ({len(self.class_names)}): {list(self.class_names.values())}"
@@ -181,8 +150,6 @@ class WasteDetector(IWasteDetector):
                 r = results[0]
                 # Stage 1: Gather raw detection boxes
                 parsed_boxes = []
-                plastic_crops = []
-                plastic_indices = []
 
                 for idx, box in enumerate(r.boxes):
                     cls_id = int(box.cls.item() if box.cls.numel() == 1 else box.cls[0].item())
@@ -220,33 +187,13 @@ class WasteDetector(IWasteDetector):
                         "y2": y2,
                         "raw_name": raw_name,
                         "waste_group": waste_group,
+                        # Resin/polymer type is NOT determined by this pipeline. The
+                        # crop-level resin classifier was removed from production because
+                        # its training class ordering could not be verified and it had no
+                        # abstention class (see docs/MODEL_SELECTION.md). "unknown" is the
+                        # honest value here.
                         "waste_type": "unknown",
                     })
-
-                    # If plastic and valid crop size, stage for batched resin classification
-                    if waste_group == "plastic" and (ix2 - ix1) >= 8 and (iy2 - iy1) >= 8:
-                        crop = image[iy1:iy2, ix1:ix2]
-                        plastic_crops.append(crop)
-                        plastic_indices.append(idx)
-
-                # Stage 2: Parallel batched resin classification for all plastic crops
-                if self.plastic_classifier and plastic_crops:
-                    try:
-                        resin_preds = self.plastic_classifier.classify_crops_batch(plastic_crops, batch_size=32)
-                        for p_idx, (resin_cls, resin_conf) in zip(plastic_indices, resin_preds):
-                            p_box = parsed_boxes[p_idx]
-                            bw = p_box["x2"] - p_box["x1"]
-                            bh = p_box["y2"] - p_box["y1"]
-                            if resin_cls != "unknown":
-                                p_box["waste_type"] = resin_cls
-                                p_box["raw_name"] = self._map_plastic_item_form(resin_cls, bw, bh)
-                                # Update confidence to reflect the ConvNeXt classification certainty
-                                if resin_conf > 0:
-                                    p_box["conf"] = round(max(p_box["conf"], resin_conf), 4)
-                            else:
-                                p_box["raw_name"] = self._map_plastic_item_form("unknown", bw, bh)
-                    except Exception as e:
-                        logger.warning(f"Batched plastic classification failed, keeping defaults: {e}")
 
                 # Build final detection items
                 for p_box in parsed_boxes:

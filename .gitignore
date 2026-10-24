@@ -91,3 +91,15 @@ Thumbs.db
 
 *.pt
 old_models/
+
+# WasteSense-Model-Lab: keep scripts and reports, exclude heavy artefacts
+WasteSense-Model-Lab/.venv/
+WasteSense-Model-Lab/models/
+WasteSense-Model-Lab/bower-seegull/
+WasteSense-Model-Lab/comparison_results/
+WasteSense-Model-Lab/test_images/
+WasteSense-Model-Lab/dataset/
+WasteSense-Model-Lab/reports/**/*.png
+
+# Unexpanded duplicate of handoff_to_cachyos/models/
+Ml-model/handoff_to_cachyos/models.zip

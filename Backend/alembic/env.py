@@ -7,9 +7,9 @@ from alembic import context
 # Add current directory to sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.core.config import settings
-from app.infrastructure.database.session import Base
-from app.infrastructure.database.models import DetectionModel, DetectionItemModel, RiskAssessmentModel
+from app.infrastructure.database.session import Base, database_url as resolved_database_url
+# Import every model module so Base.metadata is complete for autogenerate.
+from app.infrastructure.database import models  # noqa: F401
 
 config = context.config
 
@@ -20,7 +20,13 @@ target_metadata = Base.metadata
 
 
 def get_url():
-    return settings.database_url
+    """Use the same URL the application resolved.
+
+    session.py falls back to local SQLite when the configured PostgreSQL server is
+    unreachable. Alembic must migrate the database the app actually uses, otherwise
+    migrations silently target a server that is not there.
+    """
+    return resolved_database_url
 
 
 def run_migrations_offline() -> None:

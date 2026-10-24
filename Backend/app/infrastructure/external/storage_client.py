@@ -3,7 +3,16 @@ import uuid
 import logging
 from typing import Optional, Tuple
 from app.core.config import settings
-from supabase import create_client, Client
+
+# Supabase is optional: the local deployment stores uploads on disk. Importing it
+# unconditionally made the whole backend fail to start when the package was absent.
+try:
+    from supabase import create_client, Client  # type: ignore
+    HAS_SUPABASE = True
+except ImportError:  # pragma: no cover - depends on local environment
+    create_client = None  # type: ignore
+    Client = None  # type: ignore
+    HAS_SUPABASE = False
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +20,15 @@ class StorageClient:
     def __init__(self, upload_dir: Optional[str] = None):
         self.upload_dir = upload_dir or settings.UPLOAD_DIR
         self.use_supabase = bool(settings.SUPABASE_URL and settings.SUPABASE_KEY)
-        
+
+        if self.use_supabase and not HAS_SUPABASE:
+            logger.warning(
+                "SUPABASE_URL/KEY are set but the 'supabase' package is not installed; "
+                "falling back to local disk storage at %s",
+                self.upload_dir,
+            )
+            self.use_supabase = False
+
         if self.use_supabase:
             self.supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
             self.bucket_name = settings.SUPABASE_BUCKET_NAME

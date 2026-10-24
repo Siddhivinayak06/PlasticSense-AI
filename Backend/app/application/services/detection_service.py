@@ -10,7 +10,11 @@ from app.application.dto.detection_dto import (
 from app.application.interfaces.i_detection_repository import IDetectionRepository
 from app.application.interfaces.i_ml_client import IMLClient, MLClientError
 from app.application.services.feature_engine import FeatureEngine, StructuredVisualFeatures
-from app.application.services.geolocation_service import extract_gps_from_image
+from app.application.services.geolocation_service import (
+    extract_capture_time,
+    extract_gps_from_image,
+    verify_image,
+)
 from app.application.services.risk_service import RiskService
 from app.core.config import settings
 from app.domain.entities.detection import Detection
@@ -42,38 +46,52 @@ class DetectionService:
         self.feature_engine = feature_engine or FeatureEngine()
 
     def create_detection(self, dto: DetectionCreateDTO) -> DetectionResponseDTO:
-        # 1. Extract EXIF GPS
-        gps_result = extract_gps_from_image(dto.file_bytes)
+        # ── 1. Validate the upload BEFORE doing any work or storing anything ──
+        if not dto.file_bytes:
+            raise ValueError("Uploaded file is empty")
 
-        # 2. Location Fallback Logic
-        location = None
-        location_source = None
-        if gps_result["has_location"]:
-            location = Location(latitude=gps_result["latitude"], longitude=gps_result["longitude"])
-            location_source = gps_result["source"]
-            location_confidence = gps_result.get("confidence", 1.0)
-        elif dto.latitude is not None and dto.longitude is not None:
-            location = Location(latitude=dto.latitude, longitude=dto.longitude)
-            location_source = "user_provided"
-            location_confidence = 0.80
-        else:
-            location_confidence = 0.0
-
-        # Validate file size
         max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
         if len(dto.file_bytes) > max_bytes:
             raise ValueError(f"File size exceeds maximum allowed limit of {settings.MAX_UPLOAD_SIZE_MB}MB")
 
-        # Validate file extension & mime type
         ext = os.path.splitext(dto.filename)[1].lower() if dto.filename else ".jpg"
         content_type = (dto.content_type or "").lower()
         is_valid_ext = ext in ALLOWED_EXTENSIONS
         is_valid_mime = content_type in ALLOWED_MIME_TYPES or content_type.startswith("image/")
-
         if not (is_valid_ext or is_valid_mime):
             raise ValueError(f"Unsupported file type '{ext or content_type}'. Allowed types: JPG, PNG, WEBP")
 
-        # Store original image locally
+        # Extension and MIME are client-supplied claims; confirm the bytes decode.
+        if not verify_image(dto.file_bytes):
+            raise ValueError("File is not a readable image (corrupt, truncated, or mislabelled)")
+
+        # ── 2. Resolve location: explicit coordinates win, then EXIF, then OCR ──
+        # An operator who types coordinates is correcting the automatic extraction,
+        # so their input must not be silently overridden by a 0.9-confidence OCR read.
+        location = None
+        location_source = None
+        location_confidence = 0.0
+
+        if dto.latitude is not None and dto.longitude is not None:
+            location = Location(latitude=dto.latitude, longitude=dto.longitude)
+            location_source = "manual"
+            location_confidence = 1.0
+        else:
+            gps_result = extract_gps_from_image(dto.file_bytes)
+            if gps_result["has_location"]:
+                location = Location(
+                    latitude=gps_result["latitude"], longitude=gps_result["longitude"]
+                )
+                location_source = gps_result["source"]  # image_exif | image_overlay_ocr
+                location_confidence = gps_result.get("confidence", 1.0)
+            else:
+                # Never invent a coordinate. Absence is recorded explicitly so the UI
+                # can prompt for a manual pin.
+                location_source = "unavailable"
+
+        captured_at = extract_capture_time(dto.file_bytes)
+
+        # Store original image locally (never overwritten; annotated output is separate)
         image_url = self.storage_client.save_file(dto.file_bytes, dto.filename)
 
         # Construct initial Detection record
@@ -82,6 +100,7 @@ class DetectionService:
             location=location,
             location_source=location_source,
             location_confidence=location_confidence,
+            captured_at=captured_at,
             image_url=image_url,
             model_version="v1.0",
             detection_status="pending",
@@ -229,6 +248,15 @@ class DetectionService:
         # Risk assessment dictionary
         risk_data = None
         if assessment:
+            # Surface the weighted components as first-class fields. They were
+            # previously only reachable by digging through strategy_breakdown, which
+            # also mixes in logistics, rationale and legacy keys - so consumers could
+            # not render the score's derivation without knowing that layout.
+            component_scores = {
+                key: breakdown[key]
+                for key in ("coverage", "density", "composition", "hazard")
+                if key in breakdown
+            }
             risk_data = {
                 "id": assessment.id,
                 "score": assessment.score,
@@ -236,6 +264,10 @@ class DetectionService:
                 "severity": breakdown.get("severity", assessment.level.upper()),
                 "cleanup_priority": breakdown.get("cleanup_priority", "LOW"),
                 "explanation": breakdown.get("explanation", ""),
+                "component_scores": component_scores or None,
+                "component_weights": breakdown.get("component_weights"),
+                "logistics": breakdown.get("logistics"),
+                "estimated_density_label": breakdown.get("estimated_density_label"),
                 "strategy_breakdown": breakdown,
             }
 
@@ -247,6 +279,11 @@ class DetectionService:
             longitude=detection.location.longitude if detection.location else None,
             location_source=detection.location_source,
             location_confidence=detection.location_confidence,
+            captured_at=(
+                detection.captured_at.isoformat()
+                if hasattr(getattr(detection, "captured_at", None), "isoformat")
+                else getattr(detection, "captured_at", None)
+            ),
             model_version=detection.model_version,
             detection_status=detection.detection_status,
             failure_reason=detection.failure_reason,

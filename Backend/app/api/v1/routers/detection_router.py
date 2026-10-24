@@ -18,6 +18,64 @@ from app.core.logging import logger
 
 router = APIRouter(prefix="/detections", tags=["Detections"])
 
+# Reports within this great-circle distance of each other are treated as one
+# observed cluster. 2.5 km approximates a municipal ward-scale catchment.
+CLUSTER_RADIUS_M = 2500.0
+EARTH_RADIUS_M = 6_371_000.0
+
+
+def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in metres.
+
+    Replaces math.hypot() on raw degrees, which treated 1 degree of longitude as
+    equal to 1 degree of latitude. At Indian latitudes (~20 deg N) a longitude
+    degree is about 6 percent shorter, so the old comparison silently distorted
+    cluster shapes.
+    """
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = p2 - p1
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
+    return 2 * EARTH_RADIUS_M * math.asin(math.sqrt(a))
+
+
+def _cluster_by_distance(points: list, radius_m: float) -> list:
+    """Single-link spatial clustering, independent of input ordering.
+
+    The previous implementation assigned each point to the first cluster whose
+    running centroid was close enough, so the result depended on the order rows came
+    back from the database. This transitive-closure grouping returns the same
+    clusters for any permutation of the input.
+    """
+    n = len(points)
+    parent = list(range(n))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i: int, j: int) -> None:
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            parent[max(ri, rj)] = min(ri, rj)
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            d = _haversine_m(
+                points[i].latitude, points[i].longitude,
+                points[j].latitude, points[j].longitude,
+            )
+            if d <= radius_m:
+                union(i, j)
+
+    groups: dict = {}
+    for i in range(n):
+        groups.setdefault(find(i), []).append(points[i])
+    # Deterministic ordering so equal-scoring clusters do not shuffle between calls.
+    return [groups[k] for k in sorted(groups)]
+
 
 
 def _to_detection_schema(dto) -> DetectionSchema:
@@ -42,6 +100,7 @@ def _to_detection_schema(dto) -> DetectionSchema:
         longitude=dto.longitude,
         location_source=dto.location_source,
         location_confidence=dto.location_confidence,
+        captured_at=dto.captured_at,
         model_version=dto.model_version,
         detection_status=dto.detection_status,
         failure_reason=dto.failure_reason,
@@ -164,8 +223,10 @@ class HotspotItemSchema(BaseModel):
     radius: float
     report_count: int
     total_waste_objects: int
-    avg_risk_score: float
-    max_risk_score: float
+    # Null when no member report carries a risk assessment. Consumers must render
+    # "not assessed" rather than substituting a number.
+    avg_risk_score: Optional[float] = None
+    max_risk_score: Optional[float] = None
     severity: str
     priority: str
     dominant_materials: list[str]
@@ -178,6 +239,13 @@ class HotspotItemSchema(BaseModel):
 class HotspotsEnvelope(BaseModel):
     hotspots: list[HotspotItemSchema]
     total_hotspots: int
+    # Guards against this descriptive endpoint being read as a forecast.
+    is_forecast: bool = False
+    methodology: str = (
+        "Single-link spatial grouping of already-observed reports within "
+        f"{int(CLUSTER_RADIUS_M)}m great-circle distance. Descriptive only - "
+        "this does not predict future waste accumulation."
+    )
 
 
 @router.get(
@@ -202,11 +270,17 @@ def get_map_detections(
 @router.get(
     "/hotspots",
     response_model=HotspotsEnvelope,
-    summary="Get dynamically clustered pollution hotspots from real detections",
+    summary="Group geolocated reports into OBSERVED waste clusters (not a forecast)",
 )
 def get_hotspots(
     service: DetectionService = Depends(get_detection_service),
 ):
+    """Spatially group reports that have already been observed.
+
+    This is descriptive, not predictive. It summarises where reports exist today; it
+    does NOT forecast where waste will appear. Forecasting would require repeated
+    observations of the same locations over time, which this dataset does not contain.
+    """
     cached = cache_get("clustered_hotspots")
     if cached:
         return cached
@@ -217,31 +291,19 @@ def get_hotspots(
         cache_set("clustered_hotspots", res, ttl_seconds=30)
         return res
 
+    located = [d for d in items if d.latitude is not None and d.longitude is not None]
+    if not located:
+        res = HotspotsEnvelope(hotspots=[], total_hotspots=0)
+        cache_set("clustered_hotspots", res, ttl_seconds=30)
+        return res
 
-    # Spatial clustering (group within ~0.025 degrees ≈ 2.5 km)
-    clusters = []
-    for item in items:
-        if item.latitude is None or item.longitude is None:
-            continue
-        lat, lng = item.latitude, item.longitude
-        placed = False
-        for cl in clusters:
-            cl_lat = sum(d.latitude for d in cl) / len(cl)
-            cl_lng = sum(d.longitude for d in cl) / len(cl)
-            dist = math.hypot(lat - cl_lat, lng - cl_lng)
-            if dist <= 0.025:
-                cl.append(item)
-                placed = True
-                break
-        if not placed:
-            clusters.append([item])
+    clusters = _cluster_by_distance(located, CLUSTER_RADIUS_M)
 
     hotspot_list = []
     for idx, cl in enumerate(clusters):
         c_lat = sum(d.latitude for d in cl) / len(cl)
         c_lng = sum(d.longitude for d in cl) / len(cl)
         waste_objects = sum(len(d.items) for d in cl)
-
 
         # Risk scores
         risk_scores = []
@@ -256,11 +318,18 @@ def get_hotspots(
                     risk_scores.append(float(score))
                 except (ValueError, TypeError):
                     pass
-        avg_score = round(sum(risk_scores) / len(risk_scores), 1) if risk_scores else 50.0
-        max_score = round(max(risk_scores), 1) if risk_scores else 50.0
 
+        # A cluster with no scored reports has NO risk score. Previously this
+        # defaulted to 50.0, which fabricated a "medium risk" site out of absent
+        # data and made it indistinguishable from a genuinely assessed one.
+        has_risk_data = bool(risk_scores)
+        avg_score = round(sum(risk_scores) / len(risk_scores), 1) if has_risk_data else None
+        max_score = round(max(risk_scores), 1) if has_risk_data else None
 
-        if max_score >= 75:
+        if not has_risk_data:
+            severity = "unknown"
+            priority = "unranked"
+        elif max_score >= 75:
             severity = "critical"
             priority = "urgent"
         elif max_score >= 50:
@@ -280,15 +349,24 @@ def get_hotspots(
                 if it.waste_group:
                     mat_counts[it.waste_group.lower()] += 1
         sorted_mats = sorted(mat_counts.items(), key=lambda x: x[1], reverse=True)
-        dominant_mats = [m[0].title() for m in sorted_mats[:3]] or ["Plastic"]
-        most_common = dominant_mats[0]
+        # No detected materials means no dominant material. Defaulting to "Plastic"
+        # previously labelled empty clusters as plastic-dominated with no evidence.
+        dominant_mats = [m[0].title() for m in sorted_mats[:3]]
+        most_common = dominant_mats[0] if dominant_mats else "Unknown"
 
         latest_dt = max(d.created_at for d in cl)
-        radius = min(1000.0, max(250.0, float(len(cl)) * 120.0))
+        # Spread of the actual member reports, not a count-based guess.
+        radius = max(
+            150.0,
+            max(
+                _haversine_m(c_lat, c_lng, d.latitude, d.longitude)
+                for d in cl
+            ),
+        )
 
         hotspot_list.append(HotspotItemSchema(
-            id=f"HS-2026-{idx+1:02d}",
-            name=f"Zone Lat {c_lat:.3f}, Lng {c_lng:.3f}",
+            id=f"CLUSTER-{c_lat:.4f}_{c_lng:.4f}",
+            name=f"Observed cluster near {c_lat:.4f}, {c_lng:.4f}",
             latitude=round(c_lat, 6),
             longitude=round(c_lng, 6),
             radius=radius,
@@ -305,7 +383,16 @@ def get_hotspots(
             detection_ids=[d.id for d in cl],
         ))
 
-    hotspot_list.sort(key=lambda h: h.max_risk_score, reverse=True)
+    # Scored clusters first (highest risk at the top), then unscored ones, which are
+    # ranked by how much evidence they carry rather than being dropped or faked.
+    hotspot_list.sort(
+        key=lambda h: (
+            h.max_risk_score is not None,
+            h.max_risk_score if h.max_risk_score is not None else 0.0,
+            h.report_count,
+        ),
+        reverse=True,
+    )
     res = HotspotsEnvelope(hotspots=hotspot_list, total_hotspots=len(hotspot_list))
     cache_set("clustered_hotspots", res, ttl_seconds=30)
     return res

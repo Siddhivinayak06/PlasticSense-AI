@@ -70,6 +70,7 @@ class Detection:
         location: Optional[Location] = None,
         location_source: Optional[str] = None,
         location_confidence: Optional[float] = None,
+        captured_at: Optional[Any] = None,
         items: Optional[List[DetectionItem]] = None,
         risk_assessment: Optional[Any] = None,
         created_at: Optional[datetime] = None,
@@ -102,6 +103,7 @@ class Detection:
         self.failure_reason = failure_reason
         self.location_source = location_source
         self.location_confidence = location_confidence
+        self.captured_at = captured_at
         self.items = items if items is not None else []
         self.risk_assessment = risk_assessment or kwargs.get("risk_assessment")
         self.created_at = created_at or datetime.now(timezone.utc)

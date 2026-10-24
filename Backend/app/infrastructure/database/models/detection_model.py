@@ -15,6 +15,8 @@ class DetectionModel(Base):
     longitude = Column(Float, nullable=True)
     location_source = Column(String(50), nullable=True)
     location_confidence = Column(Float, nullable=True)
+    # When the photo was taken (EXIF). Distinct from created_at, which is upload time.
+    captured_at = Column(DateTime(timezone=True), nullable=True)
     model_version = Column(String(128), nullable=False, default="v1.0")
     detection_status = Column(String(32), nullable=False, default="pending")
     failure_reason = Column(String(512), nullable=True)

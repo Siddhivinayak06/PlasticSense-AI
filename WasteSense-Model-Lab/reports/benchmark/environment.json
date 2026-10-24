@@ -1,0 +1,11 @@
+{
+  "python": "3.14.7",
+  "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+  "torch": "2.14.1+cu130",
+  "ultralytics": "8.4.185",
+  "cuda_available": true,
+  "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+  "conf_threshold": 0.25,
+  "iou_threshold": 0.45,
+  "seed": 0
+}

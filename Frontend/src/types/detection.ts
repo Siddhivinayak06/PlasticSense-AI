@@ -27,6 +27,8 @@ export interface Detection {
   longitude: number | null;
   location_source?: string | null;
   location_confidence?: number | null;
+  /** EXIF capture time (ISO-8601). Distinct from created_at, which is upload time. */
+  captured_at?: string | null;
   model_version: string;
   detection_status: 'pending' | 'completed' | 'failed';
   failure_reason: string | null;

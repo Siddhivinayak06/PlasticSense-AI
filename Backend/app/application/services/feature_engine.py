@@ -14,6 +14,35 @@ from app.application.interfaces.i_waste_segmenter import SegmenterPrediction
 logger = logging.getLogger("WasteSense_AI")
 
 
+# How the waste-area figure was produced, so no consumer has to guess.
+COVERAGE_METHODS = {
+    "segmentation_mask_union": (
+        "Union of instance-segmentation masks from the TACO YOLO11s-seg model, as a "
+        "percentage of image pixels."
+    ),
+    "bbox_mask_hybrid_union": (
+        "Union of segmentation masks with detector bounding-box rectangles. Bounding "
+        "boxes include background pixels inside each rectangle, so this OVERSTATES "
+        "true object area while partially compensating for masks missed on dense waste."
+    ),
+    "detector_bbox_union": (
+        "Union of detector bounding-box rectangles only (no segmentation available). "
+        "Includes background pixels inside each box."
+    ),
+    "none": "No detector or segmenter output was available; no area could be estimated.",
+}
+
+# Shown anywhere this number is surfaced. It is an indicator, not a measurement.
+COVERAGE_LABEL = "Detected Waste Index (indicative)"
+COVERAGE_CAVEAT = (
+    "Indicative only. This is the image area covered by model detections, NOT a "
+    "validated measurement of waste extent, volume or mass. On dense aggregated "
+    "dumpsites instance-based models detect only visually separable items, so this "
+    "value substantially UNDERSTATES actual waste extent. It has not been validated "
+    "against human-annotated ground truth."
+)
+
+
 @dataclass(frozen=True)
 class StructuredVisualFeatures:
     """Clean internal visual feature representation independent of raw ML objects."""
@@ -37,10 +66,22 @@ class StructuredVisualFeatures:
     # 5. Fine-Grained Object Evidence
     fine_grained_evidence: Dict[str, Any]
 
+    # 6. Provenance of the coverage figure above. Defaulted so existing callers and
+    # tests that only care about the numeric features keep working.
+    coverage_method: str = "unspecified"
+    coverage_label: str = COVERAGE_LABEL
+    coverage_caveat: str = COVERAGE_CAVEAT
+    coverage_is_validated: bool = False
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert features to JSON-serializable dictionary."""
         return {
             "waste_coverage_percent": self.waste_coverage_percent,
+            "coverage_method": self.coverage_method,
+            "coverage_method_description": COVERAGE_METHODS.get(self.coverage_method, "unknown"),
+            "coverage_label": self.coverage_label,
+            "coverage_caveat": self.coverage_caveat,
+            "coverage_is_validated": self.coverage_is_validated,
             "object_count": self.object_count,
             "segmented_instance_count": self.segmented_instance_count,
             "total_effective_objects": self.total_effective_objects,
@@ -74,6 +115,7 @@ class FeatureEngine:
         # Segmenter masks alone vastly undercount coverage because they tightly hug the
         # object edges. Combining both gives a realistic area-of-impact estimate.
         coverage_pct = 0.0
+        coverage_method = "none"
         material_cov: Dict[str, float] = {}
         material_cnts: Dict[str, int] = {}
         segmented_count = 0
@@ -124,19 +166,24 @@ class FeatureEngine:
                         hybrid_mask = np.bitwise_or(bbox_union, (seg_mask > 0).astype(np.uint8))
                         hybrid_pixels = int(hybrid_mask.sum())
                         coverage_pct = max(seg_coverage_pct, round((hybrid_pixels / total_pixels) * 100, 2))
+                        coverage_method = "bbox_mask_hybrid_union"
                     elif segmenter_result is None:
                         det_bbox_pixels = int(bbox_union.sum())
                         det_bbox_coverage_pct = round((det_bbox_pixels / total_pixels) * 100, 2)
                         coverage_pct = det_bbox_coverage_pct
+                        coverage_method = "detector_bbox_union"
                     else:
                         coverage_pct = seg_coverage_pct
+                        coverage_method = "segmentation_mask_union"
                 except Exception:
                     # Fall back to segmenter-only coverage on any numpy error
                     coverage_pct = seg_coverage_pct
+                    coverage_method = "segmentation_mask_union"
 
         # If no detector items or coverage_pct still 0, fall back to segmenter-only coverage
         if coverage_pct == 0.0:
             coverage_pct = seg_coverage_pct
+            coverage_method = "segmentation_mask_union" if segmenter_result is not None else "none"
 
         # 2. Fine-grained detections from Model 1 (WasteSense Detector)
         obj_count = 0
@@ -219,6 +266,10 @@ class FeatureEngine:
 
         return StructuredVisualFeatures(
             waste_coverage_percent=coverage_pct,
+            coverage_method=coverage_method,
+            coverage_label=COVERAGE_LABEL,
+            coverage_caveat=COVERAGE_CAVEAT,
+            coverage_is_validated=False,
             object_count=obj_count,
             segmented_instance_count=segmented_count,
             total_effective_objects=total_effective,

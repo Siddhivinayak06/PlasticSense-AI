@@ -1,4 +1,5 @@
 import io
+from datetime import datetime
 from typing import Dict, Any, Optional
 from PIL import Image
 import re
@@ -10,6 +11,42 @@ try:
     HAS_TESSERACT = True
 except ImportError:
     HAS_TESSERACT = False
+
+def verify_image(image_bytes: bytes) -> bool:
+    """Return True only if the bytes actually decode as an image.
+
+    Extension and MIME type are client-supplied and trivially wrong; this opens the
+    payload so a mislabelled or truncated upload fails fast with a 400 instead of
+    blowing up later inside model inference.
+    """
+    try:
+        Image.open(io.BytesIO(image_bytes)).verify()
+        return True
+    except Exception:
+        return False
+
+
+def extract_capture_time(image_bytes: bytes) -> Optional[str]:
+    """Return EXIF capture time as an ISO-8601 string, or None.
+
+    This is when the photo was taken, which is not the same as when it was uploaded;
+    a dumpsite photographed last week may be uploaded today.
+    """
+    try:
+        exif = get_exif_data(image_bytes)
+        for tag in ("DateTimeOriginal", "DateTimeDigitized", "DateTime"):
+            raw = exif.get(tag)
+            if not raw:
+                continue
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8", "ignore")
+            # EXIF spells timestamps "YYYY:MM:DD HH:MM:SS".
+            parsed = datetime.strptime(str(raw).strip(), "%Y:%m:%d %H:%M:%S")
+            return parsed.isoformat()
+    except Exception as e:
+        logger.debug(f"No EXIF capture time: {e}")
+    return None
+
 
 def get_exif_data(image_bytes: bytes) -> Dict[str, Any]:
     """Extract EXIF data from image bytes."""

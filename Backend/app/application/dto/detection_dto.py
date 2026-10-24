@@ -43,3 +43,5 @@ class DetectionResponseDTO:
     segmentation: Optional[dict] = None
     features: Optional[dict] = None
     risk: Optional[dict] = None
+    # EXIF capture time (ISO-8601), distinct from created_at = upload time.
+    captured_at: Optional[str] = None
