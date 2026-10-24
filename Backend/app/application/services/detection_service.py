@@ -41,8 +41,13 @@ class DetectionService:
         self.repository = repository
         self.ml_client = ml_client
         self.risk_service = risk_service
-        self.storage_client = storage_client or StorageClient()
-        self.result_storage_client = StorageClient()
+        self.storage_client = storage_client or StorageClient(
+            settings.UPLOAD_DIR, url_prefix="/media/uploads"
+        )
+        # Annotated derivatives live beside, never on top of, the originals.
+        self.result_storage_client = StorageClient(
+            settings.RESULTS_DIR, url_prefix="/media/results"
+        )
         self.feature_engine = feature_engine or FeatureEngine()
 
     def create_detection(self, dto: DetectionCreateDTO) -> DetectionResponseDTO:
@@ -128,12 +133,9 @@ class DetectionService:
             # Save annotated visualization image (combined segmentation + boxes)
             if prediction.annotated_image_bytes:
                 result_filename = f"annotated_{dto.filename}"
-                annotated_url = self.result_storage_client.save_file(
+                saved.annotated_image_url = self.result_storage_client.save_file(
                     prediction.annotated_image_bytes, result_filename
                 )
-                if "/static/uploads" in annotated_url:
-                    annotated_url = annotated_url.replace("/static/uploads", "/media/results")
-                saved.annotated_image_url = annotated_url
 
             saved.detection_status = "completed"
             saved = self.repository.update(saved)
@@ -230,7 +232,8 @@ class DetectionService:
             group = item.waste_group
             summary[group] = summary.get(group, 0) + 1
 
-        # Fix up image_url in case it uses old /static/uploads
+        # Historical rows were stored with a /static/uploads prefix that no longer
+        # corresponds to any mount; rewrite those on read.
         img_url = detection.image_url
         if img_url and "/static/uploads" in img_url:
             img_url = img_url.replace("/static/uploads", "/media/uploads")

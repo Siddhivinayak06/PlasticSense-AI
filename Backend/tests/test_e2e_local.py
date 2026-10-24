@@ -95,6 +95,22 @@ def test_detect_returns_and_persists_results(overlay_image_bytes):
     assert got.json()["data"]["id"] == body["id"]
 
 
+def test_stored_images_are_actually_retrievable(overlay_image_bytes):
+    """Both image URLs must resolve.
+
+    Regression guard: annotated images were written to the uploads directory but
+    reported under /media/results/, so every annotated URL 404'd in the UI.
+    """
+    body = _post_detection(overlay_image_bytes, "kalyan.jpeg").json()
+    root = BASE.rsplit("/api/", 1)[0]
+    for field in ("image_url", "annotated_image_url"):
+        url = body[field]
+        assert url, f"{field} missing"
+        r = requests.get(f"{root}{url}", timeout=30)
+        assert r.status_code == 200, f"{field} -> {url} returned {r.status_code}"
+        assert r.content, f"{field} served an empty body"
+
+
 def test_coverage_is_labelled_as_indicative(overlay_image_bytes):
     body = _post_detection(overlay_image_bytes, "kalyan.jpeg").json()
     features = body["features"]

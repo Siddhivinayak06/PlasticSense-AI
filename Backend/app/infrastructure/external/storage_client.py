@@ -17,8 +17,18 @@ except ImportError:  # pragma: no cover - depends on local environment
 logger = logging.getLogger(__name__)
 
 class StorageClient:
-    def __init__(self, upload_dir: Optional[str] = None):
+    def __init__(self, upload_dir: Optional[str] = None, url_prefix: Optional[str] = None):
+        """
+        upload_dir: directory bytes are written to.
+        url_prefix: public path those bytes are served from. It MUST correspond to
+            the static mount for upload_dir. Previously _save_local always returned
+            "/static/uploads/..." no matter which directory it wrote to, and callers
+            string-rewrote the prefix afterwards - so annotated images reported
+            /media/results/<file> while the file sat in the uploads directory, and
+            every annotated image URL 404'd.
+        """
         self.upload_dir = upload_dir or settings.UPLOAD_DIR
+        self.url_prefix = (url_prefix or "/media/uploads").rstrip("/")
         self.use_supabase = bool(settings.SUPABASE_URL and settings.SUPABASE_KEY)
 
         if self.use_supabase and not HAS_SUPABASE:
@@ -60,11 +70,12 @@ class StorageClient:
             return self._save_local(file_bytes, unique_filename)
 
     def _save_local(self, file_bytes: bytes, unique_filename: str) -> str:
+        os.makedirs(self.upload_dir, exist_ok=True)
         file_path = os.path.join(self.upload_dir, unique_filename)
         with open(file_path, "wb") as f:
             f.write(file_bytes)
-        # Return relative URL path for serving statically
-        return f"/static/uploads/{unique_filename}"
+        # URL matching the static mount for this instance's directory.
+        return f"{self.url_prefix}/{unique_filename}"
 
 storage_client = StorageClient()
 LocalStorageClient = StorageClient
