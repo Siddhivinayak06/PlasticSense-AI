@@ -1,5 +1,6 @@
-import type { DetectionEnvelope, RiskEnvelope, Detection, MapDetectionEnvelope } from '@/types/detection';
+import type { DetectionEnvelope, RiskEnvelope, Detection, MapDetectionEnvelope, RiskAssessment } from '@/types/detection';
 import { api, resolveImageUrl } from '@/lib/api';
+import type { HealthData } from '@/services/analytics';
 
 export interface PaginatedDetections {
   data: Detection[];
@@ -72,15 +73,39 @@ export async function fetchMapDetections(): Promise<MapDetectionEnvelope> {
 /**
  * Fetch system health status
  */
-export async function fetchSystemHealth(): Promise<any> {
-  const { data } = await api.get('/health');
+export async function fetchSystemHealth(): Promise<HealthData> {
+  const { data } = await api.get<HealthData>('/health');
   return data;
+}
+
+export interface SystemConfig {
+  waste_groups: Record<string, { color: string; hex: string }>;
 }
 
 /**
  * Fetch system UI configuration
  */
-export async function fetchSystemConfig(): Promise<any> {
-  const { data } = await api.get('/health/config');
+export async function fetchSystemConfig(): Promise<SystemConfig> {
+  const { data } = await api.get<SystemConfig>('/health/config');
   return data;
+}
+
+const RISK_LEVELS = ['low', 'medium', 'high', 'critical'] as const;
+
+/** Normalise the risk block embedded in a detection into a RiskAssessment. */
+export function riskFromDetection(det: Detection): RiskAssessment | null {
+  if (!det.risk) return null;
+  const raw = det.risk.level?.toLowerCase();
+  const level = (RISK_LEVELS as readonly string[]).includes(raw) ? (raw as RiskAssessment['level']) : 'medium';
+  return {
+    id: det.risk.id,
+    detection_id: det.id,
+    score: det.risk.score,
+    level,
+    severity: det.risk.severity,
+    cleanup_priority: det.risk.cleanup_priority,
+    explanation: det.risk.explanation,
+    strategy_breakdown: det.risk.strategy_breakdown ?? {},
+    computed_at: det.created_at,
+  };
 }

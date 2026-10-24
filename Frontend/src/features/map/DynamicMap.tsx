@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
+import { SEVERITY_COLORS } from './StaticMiniMap';
 import { MapContainer, TileLayer, Marker, useMap, Circle } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
@@ -13,7 +14,7 @@ import type { Hotspot, MapOverlayState } from '@/types/map';
 import { MapMarkerPopup } from './MapMarkerPopup';
 
 // Fix default icons in React-Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -60,7 +61,7 @@ function MapController({ center, zoom }: { center?: [number, number]; zoom?: num
 // Custom Heatmap Layer using leaflet.heat
 function HeatmapLayer({ reports, active }: { reports: Report[]; active: boolean }) {
   const map = useMap();
-  const heatLayerRef = useRef<any>(null);
+  const heatLayerRef = useRef<L.Layer | null>(null);
 
   useEffect(() => {
     if (!active) {
@@ -77,7 +78,9 @@ function HeatmapLayer({ reports, active }: { reports: Report[]; active: boolean 
         const intensity = r.severity === 'critical' ? 1.0 : r.severity === 'high' ? 0.8 : r.severity === 'medium' ? 0.5 : 0.2;
         return [r.lat, r.lng, intensity] as [number, number, number];
       });
-      heatLayerRef.current = (L as any).heatLayer(heatData, {
+      // leaflet.heat attaches heatLayer to the L namespace without type declarations.
+      const { heatLayer } = L as unknown as { heatLayer: (data: [number, number, number][], opts: object) => L.Layer };
+      heatLayerRef.current = heatLayer(heatData, {
         radius: 25,
         blur: 15,
         maxZoom: 10,
@@ -141,8 +144,8 @@ export default function DynamicMap({ reports, hotspots, overlays, onHotspotClick
             center={[h.lat, h.lng]}
             radius={h.radius}
             pathOptions={{
-              color: h.averageSeverity === 'critical' ? '#ef4444' : h.averageSeverity === 'high' ? '#f97316' : '#eab308',
-              fillColor: h.averageSeverity === 'critical' ? '#ef4444' : h.averageSeverity === 'high' ? '#f97316' : '#eab308',
+              color: SEVERITY_COLORS[h.averageSeverity],
+              fillColor: SEVERITY_COLORS[h.averageSeverity],
               fillOpacity: 0.15,
               weight: 2,
               dashArray: '4 4'

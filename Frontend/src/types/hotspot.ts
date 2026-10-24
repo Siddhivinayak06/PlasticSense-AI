@@ -1,5 +1,7 @@
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
+/** Derived on the backend from linked cleanup assignments. */
 export type HotspotStatus = 'pending' | 'in-progress' | 'resolved' | 'verified';
+export type HotspotSeverity = Priority | 'unknown';
 
 export interface Location {
   lat: number;
@@ -8,33 +10,34 @@ export interface Location {
   city: string;
 }
 
+/**
+ * An observed cluster of geolocated reports (single-link grouping within 2.5 km).
+ * Descriptive only: it summarises reports that exist, it does not forecast.
+ */
 export interface Hotspot {
   id: string;
   name: string;
   location: Location;
+  radiusM: number;
   reportCount: number;
-  severityScore: number; // 0 to 100
-  criticalReports: number;
+  wasteObjects: number;
+  /** Peak risk score of member reports; null when none has been assessed. */
+  severityScore: number | null;
+  avgRiskScore: number | null;
+  severity: HotspotSeverity;
+  /** Null when severity is unknown. */
+  priority: Priority | null;
   plasticTypes: string[];
-  priority: Priority;
-  status: HotspotStatus;
-  lastUpdated: string;
-  cleanupProgress: number; // 0 to 100
-  riskLevel: 'extreme' | 'high' | 'moderate' | 'low';
-  trend: 'increasing' | 'stable' | 'decreasing';
-  nearbyWaterBody?: string;
   mostCommonPlastic: string;
+  status: HotspotStatus;
   assignedTeam?: string;
-  recommendedAction: string;
-  notes?: string;
+  lastUpdated: string;
+  detectionIds: string[];
+  assignmentIds: string[];
 }
 
 export interface HotspotFilters {
   severity?: string[];
   priority?: Priority[];
-  city?: string[];
   status?: HotspotStatus[];
-  dateRange?: { start: string; end: string };
-  plasticType?: string[];
-  assignedNgo?: string[];
 }

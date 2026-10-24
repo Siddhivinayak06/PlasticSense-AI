@@ -20,14 +20,7 @@ export function StatCard({ stat, index }: StatCardProps) {
   const isNeutral = stat.trend === 'neutral';
   const TrendIcon = isNeutral ? Minus : isPositive ? TrendingUp : TrendingDown;
 
-  const sparkData = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => ({
-      v: Math.max(
-        1,
-        Math.floor(stat.value * (0.65 + Math.sin(i * 0.75 + index) * 0.35 + (i / 14) * 0.2))
-      ),
-    }));
-  }, [stat.value, index]);
+  const sparkData = useMemo(() => (stat.sparkline ?? []).map((v) => ({ v })), [stat.sparkline]);
 
   const trendColor = isNeutral
     ? 'text-muted-foreground'
@@ -72,17 +65,20 @@ export function StatCard({ stat, index }: StatCardProps) {
             <Icon className={cn('size-6 transition-transform group-hover:scale-110 duration-300', stat.iconColor)} />
           </motion.div>
 
-          {/* Trend badge */}
+          {/* Trend badge: only when a real week-over-week comparison exists */}
+          {stat.change !== null && (
           <div
+            title="Last 7 days vs the previous 7 days"
             className={cn(
               'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold border border-transparent group-hover:border-current/10 transition-colors',
               trendBg,
               trendColor
             )}
           >
-            <TrendIcon className="size-3" />
-            <span>{stat.change === 0 ? '—' : `${Math.abs(stat.change)}%`}</span>
+            <TrendIcon className="size-3" aria-hidden="true" />
+            <span>{stat.change === 0 ? '0%' : `${Math.abs(stat.change)}%`}</span>
           </div>
+          )}
         </div>
 
         {/* Value and label */}
@@ -100,8 +96,9 @@ export function StatCard({ stat, index }: StatCardProps) {
         </div>
       </div>
 
-      {/* Mini Sparkline Chart */}
-      <div className="mt-3 h-9 -mx-2 -mb-1 opacity-80 group-hover:opacity-100 transition-opacity">
+      {/* Mini Sparkline Chart (real daily counts only) */}
+      {sparkData.length > 1 && (
+      <div aria-hidden="true" className="mt-3 h-9 -mx-2 -mb-1 opacity-80 group-hover:opacity-100 transition-opacity">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
             <defs>
@@ -123,6 +120,7 @@ export function StatCard({ stat, index }: StatCardProps) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
+      )}
     </motion.div>
   );
 }

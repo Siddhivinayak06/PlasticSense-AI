@@ -27,8 +27,12 @@ export function KPICard({ kpi, index }: KPICardProps) {
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{kpi.title}</p>
           <h3 className="text-2xl font-bold text-foreground">{kpi.value}</h3>
+          {kpi.hint && <p className="text-[11px] text-muted-foreground mt-1">{kpi.hint}</p>}
         </div>
-        <div className={cn(
+        {kpi.percentageChange !== null && (
+        <div
+          title="Change in the last 7 days compared with the 7 days before"
+          className={cn(
           "flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border",
           isNeutral ? "text-muted-foreground bg-muted/40 border-border" :
           isPositiveTrend ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" : "text-red-500 bg-red-500/10 border-red-500/20"
@@ -36,9 +40,11 @@ export function KPICard({ kpi, index }: KPICardProps) {
           {isNeutral ? <Minus className="size-3" /> : isPositiveTrend ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
           {Math.abs(kpi.percentageChange)}%
         </div>
+        )}
       </div>
 
-      <div className="h-12 w-full mt-auto opacity-60 group-hover:opacity-100 transition-opacity">
+      {kpi.sparklineData.length > 1 && (
+      <div className="h-12 w-full mt-auto opacity-60 group-hover:opacity-100 transition-opacity" aria-hidden="true">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={kpi.sparklineData}>
             <Line 
@@ -52,6 +58,7 @@ export function KPICard({ kpi, index }: KPICardProps) {
           </LineChart>
         </ResponsiveContainer>
       </div>
+      )}
     </motion.div>
   );
 }

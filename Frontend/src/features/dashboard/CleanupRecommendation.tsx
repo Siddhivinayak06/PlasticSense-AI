@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShieldAlert, Users, Truck, Sparkles, Clock, MapPin, ExternalLink, Layers } from 'lucide-react';
+import { ShieldAlert, Users, Truck, Sparkles, Clock, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { RiskAssessment } from '@/types/detection';
 import { cn } from '@/lib/utils';
@@ -78,8 +78,11 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
     >
       <div className="flex items-center justify-between p-4 border-b border-background/20 bg-background/20">
         <div className="flex items-center gap-2">
-          <Sparkles className={cn('size-4.5', config.color)} />
-          <h3 className="text-sm font-semibold text-foreground">AI Recommended Action</h3>
+          <Sparkles className={cn('size-4.5 shrink-0', config.color)} aria-hidden="true" />
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Suggested Response</h3>
+            <p className="text-[11px] text-muted-foreground">Rule-based guideline from the risk level; adapt to site conditions.</p>
+          </div>
         </div>
         <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', config.bg, config.color)}>
           {breakdown.cleanup_priority ? `${breakdown.cleanup_priority} Priority` : (risk.cleanup_priority ? `${risk.cleanup_priority} Priority` : `${risk.level || levelKey} Priority`)}
@@ -96,7 +99,6 @@ export function CleanupRecommendation({ risk, wasteCount }: CleanupRecommendatio
             </span>
           </p>
         </div>
-
 
         {/* Resources grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

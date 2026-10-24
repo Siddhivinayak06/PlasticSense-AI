@@ -35,10 +35,43 @@ export interface Detection {
   items: DetectionItem[];
   created_at: string;
   processing_time_ms: number | null;
-  summary: Record<string, any> | null;
+  summary: DetectionSummary | null;
   segmentation?: SegmentationInfo | null;
-  features?: Record<string, any> | null;
-  risk?: Record<string, any> | null;
+  features?: DetectionFeatures | null;
+  risk?: DetectionRisk | null;
+}
+
+/** Scalar summary; per-material counts are added under each waste group name. */
+export interface DetectionSummary {
+  total_objects?: number;
+  waste_coverage_percent?: number;
+  risk_score?: number;
+  severity?: string;
+  cleanup_priority?: string;
+  explanation?: string;
+  [group: string]: string | number | undefined;
+}
+
+export interface DetectionFeatures {
+  waste_coverage_percent?: number;
+  material_coverage?: Record<string, number>;
+  material_counts?: Record<string, number>;
+  [key: string]: unknown;
+}
+
+/** Risk assessment as embedded in a detection response. */
+export interface DetectionRisk {
+  id: string;
+  score: number;
+  level: string;
+  severity?: string;
+  cleanup_priority?: string;
+  explanation?: string;
+  component_scores?: Record<string, number> | null;
+  component_weights?: Record<string, number> | null;
+  logistics?: Record<string, unknown> | null;
+  estimated_density_label?: string | null;
+  strategy_breakdown?: RiskBreakdown;
 }
 
 // ─── API Envelope ────────────────────────────────────────────────
@@ -65,12 +98,20 @@ export interface RiskBreakdown {
   material_coverage?: Record<string, number>;
   material_counts?: Record<string, number>;
   material_proportions?: Record<string, number>;
-  hazard_indicators?: Record<string, any>;
+  hazard_indicators?: Record<string, number | boolean | string>;
   explanation?: string;
   severity?: string;
   cleanup_priority?: string;
   waterbody?: number;
-  [key: string]: any;
+  /** Rule-based logistics guidance produced by the backend risk engine. */
+  logistics?: {
+    team_size?: string;
+    estimated_time?: string;
+    suggested_resources?: string;
+    target_response_urgency?: string;
+  };
+  estimated_density_label?: string;
+  [key: string]: unknown;
 }
 
 export interface RiskAssessment {

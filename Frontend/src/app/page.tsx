@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useRef, useState, useEffect } from "react";
+import { Suspense, useRef } from "react";
+import { useMounted } from '@/hooks/useMounted';
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { Canvas } from "@react-three/fiber";
@@ -68,11 +69,7 @@ export default function LandingPage() {
   const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
 
   const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   const isLightMode = mounted ? resolvedTheme === "light" : false;
 
@@ -180,8 +177,8 @@ export default function LandingPage() {
               className="text-lg sm:text-xl text-slate-600 dark:text-slate-400 mb-10 max-w-xl leading-relaxed font-medium"
             >
               Empowering communities and organizations with AI-driven waste
-              detection. Track, analyze, and eliminate pollution hotspots
-              globally in real-time.
+              detection. Upload geotagged photos to detect waste, assess risk,
+              map hotspots and verify cleanups.
             </motion.p>
 
             <motion.div
@@ -218,7 +215,7 @@ export default function LandingPage() {
               </span>
               <span className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
               <span className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" /> Real-time AI
+                <Zap className="w-4 h-4 text-amber-500" /> Fast AI inference
               </span>
               <span className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
               <span className="flex items-center gap-2">
@@ -329,7 +326,7 @@ export default function LandingPage() {
               },
               {
                 icon: Activity,
-                title: "Real-time Processing",
+                title: "Fast Processing",
                 desc: "FastAPI backend with native YOLO inference, image caching, and seamless data pipelines.",
                 gradient: "from-rose-500/10 dark:from-rose-500/20 to-rose-500/0 dark:to-rose-500/5",
                 iconBg: "bg-rose-100 dark:bg-slate-800/80",
@@ -443,15 +440,15 @@ export default function LandingPage() {
             <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
               State-of-the-Art{" "}
               <span className="bg-gradient-to-r from-cyan-500 to-emerald-500 dark:from-cyan-400 dark:to-emerald-400 bg-clip-text text-transparent">
-                YOLOv11
+                Dual-Model
               </span>{" "}
               Detection
             </h2>
             <p className="text-lg text-slate-500 dark:text-slate-400 mb-10 leading-relaxed">
-              Powered by the latest Ultralytics models and trained on the TACO
-              dataset, WasteSense AI instantly categorizes dozens of waste
-              types — plastics, metals, glass, bio-waste, and more — with
-              industry-leading accuracy.
+              A 22-class YOLOv8n object detector finds individual items, while a
+              YOLO11s segmentation model trained on TACO outlines five material
+              groups — plastic, metal, glass, paper and other — to estimate how
+              much of the scene is covered by waste.
             </p>
             <div className="space-y-8">
               <div className="flex items-start gap-5">
@@ -461,8 +458,8 @@ export default function LandingPage() {
                 <div>
                   <h3 className="text-xl font-semibold mb-2">Real-time Inference</h3>
                   <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Process live camera feeds or batch images instantly through
-                    our robust FastAPI backend with native YOLO support.
+                    Analyse single images or batches through the FastAPI backend,
+                    on GPU when available, typically in well under a second per image.
                   </p>
                 </div>
               </div>

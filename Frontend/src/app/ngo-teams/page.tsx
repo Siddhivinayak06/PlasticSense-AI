@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Building2, MapPin, Users, ClipboardList, CheckCircle, Clock, Award, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -9,6 +9,8 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchNGOs, type NGOModel } from '@/services/ngos';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { AddNGODialog } from '@/features/ngos/AddNGODialog';
+import { DataNote, QueryError } from '@/components/shared/QueryError';
 
 const WORKLOAD_CONFIG = {
   light: { label: 'Light', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
@@ -37,7 +39,17 @@ function NGOCard({ ngo, index }: { ngo: NGOModel; index: number }) {
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground truncate">{ngo.name}</h3>
+          <h3 className="text-sm font-semibold text-foreground truncate" title={ngo.name}>
+            {ngo.name}
+            {ngo.is_sample && (
+              <span
+                title="Seeded demonstration record: contact details and figures are fictional"
+                className="ml-1.5 inline-flex rounded border border-dashed border-muted-foreground/40 px-1 text-[10px] font-medium uppercase text-muted-foreground align-middle"
+              >
+                Sample
+              </span>
+            )}
+          </h3>
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
             <MapPin className="size-3 shrink-0" />
             <span>{ngo.city}, {ngo.state}</span>
@@ -52,8 +64,14 @@ function NGOCard({ ngo, index }: { ngo: NGOModel; index: number }) {
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
           <Award className="size-4 text-primary" />
-          <span className="text-lg font-bold text-primary">{ngo.performance_score}</span>
-          <span className="text-xs text-muted-foreground">/100</span>
+          {ngo.performance_score > 0 ? (
+            <>
+              <span className="text-lg font-bold text-primary">{ngo.performance_score}</span>
+              <span className="text-xs text-muted-foreground">/100</span>
+            </>
+          ) : (
+            <span className="text-sm font-medium text-muted-foreground">Not rated yet</span>
+          )}
         </div>
         <div className={cn('flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold', workload.bg, workload.color)}>
           {workload.label} Load
@@ -87,7 +105,7 @@ function NGOCard({ ngo, index }: { ngo: NGOModel; index: number }) {
           <Clock className="size-3.5 text-muted-foreground" />
           <div>
             <span className="text-muted-foreground">Avg. Time</span>
-            <p className="font-semibold text-foreground">{ngo.avg_completion_days} days</p>
+            <p className="font-semibold text-foreground">{ngo.avg_completion_days > 0 ? `${ngo.avg_completion_days} days` : '—'}</p>
           </div>
         </div>
       </div>
@@ -103,9 +121,9 @@ function NGOCard({ ngo, index }: { ngo: NGOModel; index: number }) {
 
       {/* Actions */}
       <div className="flex gap-2 pt-1">
-        <Link href={`/assignments?assign_ngo_id=${ngo.id}`} className="w-full">
+        <Link href="/assignments" className="w-full">
           <Button variant="default" size="xs" className="w-full text-xs">
-            Assign Cleanup Operation
+            View Assignments
           </Button>
         </Link>
       </div>
@@ -116,7 +134,7 @@ function NGOCard({ ngo, index }: { ngo: NGOModel; index: number }) {
 export default function NGOTeamsPage() {
   const [search, setSearch] = useState('');
 
-  const { data: ngos, isLoading } = useQuery({
+  const { data: ngos, isLoading, isError, refetch } = useQuery({
     queryKey: ['ngos'],
     queryFn: fetchNGOs,
   });
@@ -139,10 +157,10 @@ export default function NGOTeamsPage() {
             NGO Teams
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage NGO partners, monitor workload, and assign verified cleanup operations.
+            Partner organisations available for cleanup assignments.
           </p>
         </div>
-
+        <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <input
@@ -150,11 +168,20 @@ export default function NGOTeamsPage() {
             placeholder="Search NGOs..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-[240px] rounded-xl border border-border/60 bg-muted/40 pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
+            className="w-full sm:w-[240px] rounded-xl border border-border/60 bg-muted/40 pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
             aria-label="Search NGOs"
           />
         </div>
+        <AddNGODialog />
+        </div>
       </div>
+
+      {ngos?.some((n) => n.is_sample) && (
+        <DataNote>
+          Teams marked <strong>Sample</strong> were seeded by an earlier version of the app. Their contacts and figures are
+          fictional; add your real partner organisations with “Add NGO Team”.
+        </DataNote>
+      )}
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -183,7 +210,9 @@ export default function NGOTeamsPage() {
       </div>
 
       {/* NGO Grid */}
-      {isLoading ? (
+      {isError ? (
+        <QueryError onRetry={() => refetch()} />
+      ) : isLoading ? (
         <div className="flex h-64 items-center justify-center rounded-2xl border border-border/50 bg-muted/20">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
@@ -197,7 +226,7 @@ export default function NGOTeamsPage() {
         <EmptyState
           icon={Building2}
           title="No NGO teams found"
-          description="Try adjusting your search query."
+          description={ngos?.length ? 'Try adjusting your search query.' : 'No partner organisations yet. Add one to start assigning cleanups.'}
         />
       )}
     </div>

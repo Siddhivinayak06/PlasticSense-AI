@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useMemo, useState, useEffect } from "react";
+import { useRef, useMemo } from "react";
+import { useMounted } from '@/hooks/useMounted';
 import { useTheme } from "next-themes";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
@@ -101,11 +102,8 @@ export function InteractiveGlobe({ isLightMode: isLightModeProp }: InteractiveGl
   const hotspotsRef = useRef<THREE.Group>(null);
 
   const { resolvedTheme } = useTheme();
-  const [mountedLight, setMountedLight] = useState(false);
-
-  useEffect(() => {
-    setMountedLight(resolvedTheme === "light");
-  }, [resolvedTheme]);
+  const mounted = useMounted();
+  const mountedLight = mounted && resolvedTheme === "light";
 
   const isLightMode = isLightModeProp !== undefined ? isLightModeProp : mountedLight;
 
@@ -116,10 +114,14 @@ export function InteractiveGlobe({ isLightMode: isLightModeProp }: InteractiveGl
     "/textures/earth-clouds.png",
   ]);
 
+  // Configuring loaded three.js textures in place is the standard R3F pattern;
+  // these are GPU resources owned by the loader cache, not React state.
   useMemo(() => {
+    /* eslint-disable react-hooks/immutability */
     earthMap.colorSpace = THREE.SRGBColorSpace;
     earthMap.anisotropy = 8;
     cloudsMap.colorSpace = THREE.SRGBColorSpace;
+    /* eslint-enable react-hooks/immutability */
   }, [earthMap, cloudsMap]);
 
   useFrame((_state, delta) => {

@@ -1,6 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchHotspots } from '@/services/hotspots';
+import { fetchNGOs } from '@/services/ngos';
+import { fetchAssignments } from '@/services/assignments';
+import { fetchDetections } from '@/services/detection';
+import { sidebarMenuGroups } from '@/constants/navigation';
 import { Search, X, FileText, MapPin, Flame, Building2, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -15,30 +21,42 @@ interface SearchResult {
 
 const CATEGORY_CONFIG = {
   report: { icon: FileText, label: 'Report', color: 'text-blue-500' },
-  location: { icon: MapPin, label: 'Location', color: 'text-emerald-500' },
+  location: { icon: MapPin, label: 'Page', color: 'text-emerald-500' },
   hotspot: { icon: Flame, label: 'Hotspot', color: 'text-orange-500' },
   ngo: { icon: Building2, label: 'NGO', color: 'text-violet-500' },
   assignment: { icon: ClipboardList, label: 'Assignment', color: 'text-cyan-500' },
 };
 
-// Mock search index for demo
-const SEARCH_INDEX: SearchResult[] = [
-  { id: '1', label: 'RPT-2026-001', category: 'report', href: '/history', subtitle: 'Juhu Beach, Mumbai' },
-  { id: '2', label: 'RPT-2026-002', category: 'report', href: '/history', subtitle: 'Marina Beach, Chennai' },
-  { id: '3', label: 'RPT-2026-003', category: 'report', href: '/history', subtitle: 'Baga Beach, Goa' },
-  { id: '4', label: 'Mumbai Coastal Area', category: 'hotspot', href: '/hotspots', subtitle: 'Critical · 94/100' },
-  { id: '5', label: 'Chennai Coast', category: 'hotspot', href: '/hotspots', subtitle: 'High · 78/100' },
-  { id: '6', label: 'Goa Beach Zone', category: 'hotspot', href: '/hotspots', subtitle: 'Medium · 52/100' },
-  { id: '7', label: 'Green Earth Foundation', category: 'ngo', href: '/ngo-teams', subtitle: 'Mumbai · 4 active' },
-  { id: '8', label: 'Ocean Crusaders', category: 'ngo', href: '/ngo-teams', subtitle: 'Chennai · 2 active' },
-  { id: '9', label: 'Eco Warriors India', category: 'ngo', href: '/ngo-teams', subtitle: 'Goa · 3 active' },
-  { id: '10', label: 'CLN-2026-0001', category: 'assignment', href: '/assignments', subtitle: 'Juhu Beach Cleanup' },
-  { id: '11', label: 'CLN-2026-0042', category: 'assignment', href: '/assignments', subtitle: 'Marina Beach Cleanup' },
-  { id: '12', label: 'Juhu Beach', category: 'location', href: '/map', subtitle: 'Mumbai, Maharashtra' },
-  { id: '13', label: 'Marina Beach', category: 'location', href: '/map', subtitle: 'Chennai, Tamil Nadu' },
-  { id: '14', label: 'Plastic Bottles', category: 'report', href: '/analytics', subtitle: 'Waste Category' },
-  { id: '15', label: 'Plastic Bags', category: 'report', href: '/analytics', subtitle: 'Waste Category' },
-];
+const PAGES: SearchResult[] = sidebarMenuGroups.flatMap((g) =>
+  g.items.map((item) => ({ id: `page-${item.id}`, label: item.label, category: 'location' as const, href: item.href, subtitle: 'Page' })),
+);
+
+/** Search index built from live API data; fetched only once the search is opened. */
+function useSearchIndex(enabled: boolean): SearchResult[] {
+  const opts = { enabled, staleTime: 60_000 };
+  const hotspots = useQuery({ queryKey: ['hotspots'], queryFn: fetchHotspots, ...opts });
+  const ngos = useQuery({ queryKey: ['ngos'], queryFn: fetchNGOs, ...opts });
+  const assignments = useQuery({ queryKey: ['assignments'], queryFn: () => fetchAssignments(), ...opts });
+  const reports = useQuery({ queryKey: ['detections', 'search'], queryFn: () => fetchDetections(1, 100), ...opts });
+
+  return useMemo(() => [
+    ...PAGES,
+    ...(hotspots.data?.hotspots ?? []).map((h) => ({
+      id: h.id, label: h.name, category: 'hotspot' as const, href: `/hotspots/${encodeURIComponent(h.id)}`,
+      subtitle: `${h.report_count} reports · ${h.severity === 'unknown' ? 'not assessed' : `${h.severity} risk`}`,
+    })),
+    ...(ngos.data ?? []).map((n) => ({
+      id: n.id, label: n.name, category: 'ngo' as const, href: '/ngo-teams', subtitle: `${n.city}${n.is_sample ? ' · sample' : ''}`,
+    })),
+    ...(assignments.data ?? []).map((a) => ({
+      id: a.id, label: a.title, category: 'assignment' as const, href: `/assignments/${a.id}`, subtitle: `${a.id} · ${a.status.replace('_', ' ')}`,
+    })),
+    ...(reports.data?.data ?? []).map((d) => ({
+      id: d.id, label: `Report ${d.id.slice(0, 8)}`, category: 'report' as const, href: `/history/${d.id}`,
+      subtitle: `${new Date(d.created_at).toLocaleDateString()} · ${d.items.length} objects · ${d.items.map((i) => i.class_name).slice(0, 3).join(', ')}`,
+    })),
+  ], [hotspots.data, ngos.data, assignments.data, reports.data]);
+}
 
 interface SearchBoxProps {
   placeholder?: string;
@@ -47,24 +65,23 @@ interface SearchBoxProps {
 export function SearchBox({ placeholder = 'Search reports, hotspots, NGOs...' }: SearchBoxProps) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const index = useSearchIndex(isOpen || query.length > 0);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
-    const q = query.toLowerCase();
-    const filtered = SEARCH_INDEX.filter(
-      (item) =>
-        item.label.toLowerCase().includes(q) ||
-        item.subtitle?.toLowerCase().includes(q) ||
-        item.category.includes(q),
-    ).slice(0, 8);
-    setResults(filtered);
-  }, [query]);
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return index
+      .filter(
+        (item) =>
+          item.label.toLowerCase().includes(q) ||
+          item.id.toLowerCase().includes(q) ||
+          item.subtitle?.toLowerCase().includes(q) ||
+          item.category.includes(q),
+      )
+      .slice(0, 8);
+  }, [query, index]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -115,7 +132,7 @@ export function SearchBox({ placeholder = 'Search reports, hotspots, NGOs...' }:
         />
         {query ? (
           <button
-            onClick={() => { setQuery(''); setResults([]); }}
+            onClick={() => setQuery('')}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             aria-label="Clear search"
           >

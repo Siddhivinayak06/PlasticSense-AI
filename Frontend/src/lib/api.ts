@@ -31,3 +31,18 @@ export function resolveImageUrl(imagePath: string | null | undefined): string {
   const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
   return `${getBaseUrl()}${path}`;
 }
+
+/** Human-readable message from an API error (FastAPI `detail`), never a stack trace. */
+export function apiErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
+  if (axios.isAxiosError(error)) {
+    if (!error.response) return 'Cannot reach the WasteSense API. Is the backend running on port 8000?';
+    const detail = (error.response.data as { detail?: unknown } | undefined)?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail) && detail.length && typeof detail[0]?.msg === 'string') {
+      const loc = Array.isArray(detail[0].loc) ? detail[0].loc[detail[0].loc.length - 1] : '';
+      return loc ? `${loc}: ${detail[0].msg}` : detail[0].msg;
+    }
+    if (error.response.status === 429) return 'Too many requests. Please wait a moment and try again.';
+  }
+  return fallback;
+}

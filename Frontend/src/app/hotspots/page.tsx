@@ -2,8 +2,9 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchHotspots } from '@/services/hotspots';
-import type { Hotspot, Priority, HotspotStatus } from '@/types/hotspot';
+import { fetchHotspots, toHotspot } from '@/services/hotspots';
+import { DataNote, QueryError } from '@/components/shared/QueryError';
+import type { Hotspot } from '@/types/hotspot';
 import { HotspotCard } from '@/features/hotspots/HotspotCard';
 import { HotspotFilters } from '@/features/hotspots/HotspotFilters';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,50 +19,12 @@ export default function HotspotsPage() {
   });
   const [sortBy, setSortBy] = useState<'severity' | 'newest' | 'reports'>('severity');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['hotspots'],
     queryFn: fetchHotspots,
   });
 
-  // Map backend hotspots to Hotspot interface
-  const realHotspots: Hotspot[] = useMemo(() => {
-    if (!data?.hotspots) return [];
-    return data.hotspots.map((h) => {
-      const priority: Priority = ['critical', 'high', 'medium', 'low'].includes(h.severity)
-        ? (h.severity as Priority)
-        : 'medium';
-
-      const status: HotspotStatus = h.status === 'completed'
-        ? 'resolved'
-        : h.status === 'in_progress'
-        ? 'in-progress'
-        : 'pending';
-
-      return {
-        id: h.id,
-        name: h.name,
-        location: {
-          lat: h.latitude,
-          lng: h.longitude,
-          address: `Coordinates: ${h.latitude.toFixed(4)}, ${h.longitude.toFixed(4)}`,
-          city: `Lat ${h.latitude.toFixed(2)}, Lng ${h.longitude.toFixed(2)}`,
-        },
-        reportCount: h.report_count,
-        severityScore: Math.round(h.max_risk_score),
-        criticalReports: h.severity === 'critical' ? h.report_count : 0,
-        plasticTypes: h.dominant_materials,
-        priority,
-        status,
-        lastUpdated: h.last_updated,
-        cleanupProgress: status === 'resolved' ? 100 : status === 'in-progress' ? 50 : 15,
-        riskLevel: h.severity === 'critical' ? 'extreme' : h.severity === 'high' ? 'high' : h.severity === 'medium' ? 'moderate' : 'low',
-        trend: 'stable',
-        nearbyWaterBody: 'Coastal/Marine Zone',
-        mostCommonPlastic: h.most_common_material,
-        recommendedAction: `Deploy cleanup team for ${h.total_waste_objects} detected objects (${h.dominant_materials.join(', ')})`,
-      };
-    });
-  }, [data]);
+  const realHotspots: Hotspot[] = useMemo(() => (data?.hotspots ?? []).map(toHotspot), [data]);
 
   const filteredHotspots = useMemo(() => {
     return realHotspots.filter(hotspot => {
@@ -70,12 +33,12 @@ export default function HotspotsPage() {
         hotspot.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         hotspot.location.city.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesPriority = filters.priority.length === 0 || filters.priority.includes(hotspot.priority);
+      const matchesPriority = filters.priority.length === 0 || (hotspot.priority !== null && filters.priority.includes(hotspot.priority));
       const matchesStatus = filters.status.length === 0 || filters.status.includes(hotspot.status);
 
       return matchesSearch && matchesPriority && matchesStatus;
     }).sort((a, b) => {
-      if (sortBy === 'severity') return b.severityScore - a.severityScore;
+      if (sortBy === 'severity') return (b.severityScore ?? -1) - (a.severityScore ?? -1);
       if (sortBy === 'reports') return b.reportCount - a.reportCount;
       return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
     });
@@ -90,12 +53,13 @@ export default function HotspotsPage() {
             Hotspot Overview
           </h1>
           <p className="text-muted-foreground mt-1">
-            Real-time geospatial clusters computed from validated waste detections.
+            Geolocated reports grouped into observed clusters (within 2.5 km of each other).
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <Button
+            aria-pressed={sortBy === 'severity'}
             variant={sortBy === 'severity' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setSortBy('severity')}
@@ -103,18 +67,36 @@ export default function HotspotsPage() {
             Highest Severity
           </Button>
           <Button
+            aria-pressed={sortBy === 'reports'}
             variant={sortBy === 'reports' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setSortBy('reports')}
           >
             Most Reports
           </Button>
+          <Button
+            aria-pressed={sortBy === 'newest'}
+            variant={sortBy === 'newest' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSortBy('newest')}
+          >
+            Newest
+          </Button>
         </div>
       </div>
 
       <HotspotFilters onSearch={setSearchTerm} onFilterChange={setFilters} />
 
-      {isLoading ? (
+      {data && (
+        <DataNote>
+          {data.total_hotspots} cluster{data.total_hotspots === 1 ? '' : 's'} from reports with GPS coordinates. Status reflects linked
+          cleanup assignments. These describe where waste has been reported; they are not a forecast.
+        </DataNote>
+      )}
+
+      {isError ? (
+        <QueryError onRetry={() => refetch()} />
+      ) : isLoading ? (
         <div className="flex h-64 items-center justify-center rounded-2xl border border-border/50 bg-muted/20">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
@@ -137,7 +119,9 @@ export default function HotspotsPage() {
           </div>
           <h3 className="text-xl font-semibold mb-2">No hotspots found</h3>
           <p className="text-muted-foreground max-w-md">
-            We couldn't find any hotspots matching your current filters. Try adjusting your search or clearing the filters.
+            {realHotspots.length === 0
+              ? 'No geolocated reports yet. Hotspots appear once analysed images include GPS (EXIF, overlay, or manual coordinates).'
+              : 'No hotspots match the current filters. Try adjusting your search or clearing the filters.'}
           </p>
           <Button variant="outline" className="mt-6" onClick={() => {
             setSearchTerm('');

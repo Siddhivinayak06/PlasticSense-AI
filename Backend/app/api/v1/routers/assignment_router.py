@@ -1,42 +1,50 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db, get_detection_service
+from app.api.upload_guard import inference_rate_limit
+from app.api.v1.routers.detection_router import run_detection
+from app.core.cache import cache_clear
 from app.application.services.detection_service import DetectionService
-from app.application.dto.detection_dto import DetectionCreateDTO
 from app.infrastructure.database.models.assignment_model import CleanupAssignmentModel
 from app.infrastructure.database.models.ngo_model import NGOTeamModel
 from app.infrastructure.database.models.detection_model import DetectionModel
-from app.core.logging import logger
 
 router = APIRouter(prefix="/assignments", tags=["Cleanup Assignments"])
 
 
+Priority = Literal["low", "medium", "high", "urgent"]
+Severity = Literal["low", "medium", "high", "critical"]
+# "verified" and "rejected" are outcomes of AI verification (POST /verify) and
+# cannot be set by hand, otherwise a cleanup could be marked verified with no evidence.
+ManualStatus = Literal["pending", "assigned", "in_progress", "completed"]
+
+
 class AssignmentCreateSchema(BaseModel):
-    title: str
-    detection_id: Optional[str] = None
-    hotspot_id: Optional[str] = None
-    location_name: str
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    priority: str = "medium"
-    severity: str = "medium"
-    risk_score: float = 50.0
-    waste_count: int = 0
-    ngo_team_id: Optional[str] = None
+    title: str = Field(min_length=1, max_length=200)
+    detection_id: Optional[str] = Field(None, max_length=64)
+    hotspot_id: Optional[str] = Field(None, max_length=64)
+    location_name: str = Field(min_length=1, max_length=200)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    priority: Priority = "medium"
+    severity: Severity = "medium"
+    risk_score: float = Field(50.0, ge=0, le=100)
+    waste_count: int = Field(0, ge=0, le=100_000)
+    ngo_team_id: Optional[str] = Field(None, max_length=64)
     scheduled_date: Optional[datetime] = None
-    notes: Optional[str] = None
-    before_image_url: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
+    before_image_url: Optional[str] = Field(None, max_length=512, pattern=r"^/media/(uploads|results)/[A-Za-z0-9_.-]+$")
 
 
 class AssignmentUpdateSchema(BaseModel):
-    status: Optional[str] = None  # pending, assigned, in_progress, completed, verified, rejected
-    ngo_team_id: Optional[str] = None
-    notes: Optional[str] = None
+    status: Optional[ManualStatus] = None
+    ngo_team_id: Optional[str] = Field(None, max_length=64)
+    notes: Optional[str] = Field(None, max_length=2000)
     scheduled_date: Optional[datetime] = None
     completed_date: Optional[datetime] = None
 
@@ -66,6 +74,7 @@ class AssignmentSchema(BaseModel):
     after_image_url: Optional[str]
     created_at: datetime
     updated_at: datetime
+    is_sample: bool = False
 
     class Config:
         from_attributes = True
@@ -73,7 +82,7 @@ class AssignmentSchema(BaseModel):
 
 @router.get("", response_model=List[AssignmentSchema], summary="List cleanup assignments")
 async def list_assignments(
-    status_filter: Optional[str] = None,
+    status_filter: Optional[Literal["pending", "assigned", "in_progress", "completed", "verified", "rejected"]] = None,
     db: Session = Depends(get_db),
 ):
     query = db.query(CleanupAssignmentModel).order_by(CleanupAssignmentModel.created_at.desc())
@@ -98,22 +107,31 @@ async def create_assignment(
 
     if payload.detection_id:
         det = db.query(DetectionModel).filter(DetectionModel.id == payload.detection_id).first()
-        if det:
-            lat = lat if lat is not None else det.latitude
-            lng = lng if lng is not None else det.longitude
-            before_img = before_img or det.image_url
-            waste_count = waste_count or len(det.items)
-            if det.risk_assessment:
+        if not det:
+            raise HTTPException(status_code=404, detail="Detection not found")
+        # Inherit from the report only what the client did not state explicitly
+        # (e.g. a hotspot sends its cluster-wide peak risk and total object count).
+        explicit = payload.model_fields_set
+        lat = lat if lat is not None else det.latitude
+        lng = lng if lng is not None else det.longitude
+        before_img = before_img or det.annotated_image_url or det.image_url
+        if "waste_count" not in explicit:
+            waste_count = len(det.items)
+        if det.risk_assessment:
+            if "risk_score" not in explicit:
                 risk_score = det.risk_assessment.score
+            if "severity" not in explicit:
                 severity = det.risk_assessment.level.lower()
+            if "priority" not in explicit:
                 priority = "urgent" if risk_score >= 75 else "high" if risk_score >= 50 else "medium"
 
     ngo_name = None
     if payload.ngo_team_id:
         ngo = db.query(NGOTeamModel).filter(NGOTeamModel.id == payload.ngo_team_id).first()
-        if ngo:
-            ngo_name = ngo.name
-            ngo.active_assignments += 1
+        if not ngo:
+            raise HTTPException(status_code=404, detail="NGO team not found")
+        ngo_name = ngo.name
+        ngo.active_assignments += 1
 
     assignment_id = f"CLN-{datetime.now(timezone.utc).year}-{uuid.uuid4().hex[:6].upper()}"
     assignment = CleanupAssignmentModel(
@@ -139,6 +157,7 @@ async def create_assignment(
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
+    cache_clear()
     return assignment
 
 
@@ -173,11 +192,12 @@ async def update_assignment(
 
     if payload.ngo_team_id is not None:
         ngo = db.query(NGOTeamModel).filter(NGOTeamModel.id == payload.ngo_team_id).first()
-        if ngo:
-            assignment.ngo_team_id = ngo.id
-            assignment.ngo_team_name = ngo.name
-            if assignment.status == "pending":
-                assignment.status = "assigned"
+        if not ngo:
+            raise HTTPException(status_code=404, detail="NGO team not found")
+        assignment.ngo_team_id = ngo.id
+        assignment.ngo_team_name = ngo.name
+        if assignment.status == "pending":
+            assignment.status = "assigned"
 
     if payload.notes is not None:
         assignment.notes = payload.notes
@@ -190,6 +210,7 @@ async def update_assignment(
 
     db.commit()
     db.refresh(assignment)
+    cache_clear()
     return assignment
 
 
@@ -197,28 +218,27 @@ async def update_assignment(
 async def verify_assignment(
     assignment_id: str,
     file: UploadFile = File(...),
-    notes: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None, max_length=2000),
     detection_service: DetectionService = Depends(get_detection_service),
     db: Session = Depends(get_db),
+    _limited: None = Depends(inference_rate_limit),
 ):
     assignment = db.query(CleanupAssignmentModel).filter(CleanupAssignmentModel.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    file_bytes = await file.read()
-    dto = DetectionCreateDTO(
-        latitude=assignment.latitude,
-        longitude=assignment.longitude,
-        filename=file.filename or "verification_after.jpg",
-        content_type=file.content_type or "image/jpeg",
-        file_bytes=file_bytes,
-    )
+    if assignment.status in ("verified",):
+        raise HTTPException(status_code=409, detail="Assignment is already verified")
 
-    try:
-        detection_result = detection_service.create_detection(dto)
-    except Exception as e:
-        logger.error(f"Post-cleanup verification detection failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Inference failed on verification image: {e}")
+    # Same validation, size limit and safe error mapping as a normal analysis.
+    detection_result = await run_detection(
+        detection_service, file, assignment.latitude, assignment.longitude
+    )
+    if detection_result.detection_status != "completed":
+        raise HTTPException(
+            status_code=502,
+            detail="AI analysis of the verification image failed; the assignment was not changed.",
+        )
 
     waste_before = assignment.waste_before or assignment.waste_count or 1
     waste_after = len(detection_result.items)
@@ -241,4 +261,5 @@ async def verify_assignment(
 
     db.commit()
     db.refresh(assignment)
+    cache_clear()
     return assignment

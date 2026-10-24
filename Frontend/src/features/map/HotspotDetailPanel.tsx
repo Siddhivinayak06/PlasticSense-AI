@@ -1,7 +1,8 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, AlertTriangle, Box, Users, Target, Activity, MapPin } from 'lucide-react';
+import Link from 'next/link';
+import { X, Box, Users, Gauge, MapPin, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Hotspot } from '@/types/map';
 import { cn } from '@/lib/utils';
@@ -27,7 +28,8 @@ export function HotspotDetailPanel({ hotspot, onClose }: HotspotDetailPanelProps
              <Button 
                variant="ghost" 
                size="icon-xs" 
-               onClick={onClose} 
+               onClick={onClose}
+               aria-label="Close hotspot details"
                className="absolute top-4 right-4 h-6 w-6 rounded-full bg-background/50 hover:bg-background/80"
              >
                <X className="size-3.5" />
@@ -40,7 +42,7 @@ export function HotspotDetailPanel({ hotspot, onClose }: HotspotDetailPanelProps
              <h2 className="text-lg font-bold text-foreground leading-tight">{hotspot.name}</h2>
              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                <MapPin className="size-3" />
-               {hotspot.lat.toFixed(4)}°N, {hotspot.lng.toFixed(4)}°E
+               {hotspot.lat.toFixed(4)}, {hotspot.lng.toFixed(4)}
              </p>
           </div>
 
@@ -60,19 +62,15 @@ export function HotspotDetailPanel({ hotspot, onClose }: HotspotDetailPanelProps
                  )}>{hotspot.averageSeverity}</p>
               </div>
               <div className="glass bg-white/40 dark:bg-slate-900/40 rounded-xl p-3 border-none">
-                 <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Critical Issues</p>
-                 <p className="text-xl font-bold text-red-500">{hotspot.criticalReports}</p>
+                 <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Peak Risk</p>
+                 <p className="text-xl font-bold text-foreground flex items-center gap-1.5">
+                   <Gauge className="size-4 text-muted-foreground" aria-hidden="true" />
+                   {hotspot.maxRiskScore === null ? '—' : Math.round(hotspot.maxRiskScore)}
+                 </p>
               </div>
               <div className="glass bg-white/40 dark:bg-slate-900/40 rounded-xl p-3 border-none">
-                 <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Trend</p>
-                 <div className="flex items-center gap-1.5 mt-1">
-                   <Activity className={cn(
-                     "size-4", 
-                     hotspot.trend === 'increasing' ? 'text-red-500' : 
-                     hotspot.trend === 'decreasing' ? 'text-emerald-500' : 'text-blue-500'
-                   )} />
-                   <span className="text-sm font-semibold capitalize">{hotspot.trend}</span>
-                 </div>
+                 <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Objects</p>
+                 <p className="text-xl font-bold text-foreground">{hotspot.wasteObjects}</p>
               </div>
             </div>
 
@@ -80,7 +78,7 @@ export function HotspotDetailPanel({ hotspot, onClose }: HotspotDetailPanelProps
             <div>
               <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-3">
                 <Box className="size-3.5 text-muted-foreground" />
-                Dominant Plastic Types
+                Dominant Materials
               </h3>
               <div className="flex flex-wrap gap-1.5">
                 {hotspot.plasticTypes.map((pt, i) => (
@@ -91,36 +89,23 @@ export function HotspotDetailPanel({ hotspot, onClose }: HotspotDetailPanelProps
               </div>
             </div>
 
-            {/* Cleanup Progress */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Target className="size-3.5 text-muted-foreground" />
-                  Cleanup Progress
-                </h3>
-                <span className="text-xs font-bold text-foreground">{hotspot.cleanupProgress}%</span>
-              </div>
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-emerald-500 rounded-full" 
-                  style={{ width: `${hotspot.cleanupProgress}%` }} 
-                />
-              </div>
-            </div>
-
-            {/* Assignment */}
+            {/* Cleanup status from linked assignments */}
             <div className="pt-2 border-t border-border/50">
                <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-1.5">
-                 <Users className="size-3.5 text-muted-foreground" />
-                 Assigned Team
+                 <Users className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                 Cleanup
                </h3>
-               <p className="text-sm text-muted-foreground">{hotspot.assignedTeam}</p>
+               <p className="text-sm text-muted-foreground capitalize">
+                 {hotspot.status.replace('_', ' ')}{hotspot.assignedTeam ? ` · ${hotspot.assignedTeam}` : ' · no team assigned'}
+               </p>
             </div>
-            
-            <Button className="w-full mt-2 gap-2" variant="default">
-              <AlertTriangle className="size-4" />
-              Dispatch Emergency Team
-            </Button>
+
+            <Link href={`/hotspots/${encodeURIComponent(hotspot.id)}`} className="block">
+              <Button className="w-full mt-2 gap-2" variant="default">
+                Open hotspot details
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Button>
+            </Link>
           </div>
         </motion.div>
       )}

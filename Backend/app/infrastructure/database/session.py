@@ -9,7 +9,7 @@ from app.core.config import settings
 logger = logging.getLogger("WasteSense_AI")
 
 # Local SQLite file that already holds this project's development data.
-_SQLITE_PATH = Path(__file__).resolve().parents[3] / "wastesense.db"
+_SQLITE_PATH = Path(settings.SQLITE_PATH or Path(__file__).resolve().parents[3] / "wastesense.db").resolve()
 SQLITE_URL = f"sqlite:///{_SQLITE_PATH}"
 
 
@@ -27,8 +27,11 @@ def _build_engine(url: str):
             "keepalives_interval": 10,
             "keepalives_count": 5,
         },
-        pool_size=15,
-        max_overflow=15,
+        # Supabase's session-mode pooler (port 5432) caps clients per project at the
+        # plan's pool size (15 on the smallest tiers). 15+15 could exhaust it and fail
+        # with "MaxClientsInSessionMode"; a single local server needs far fewer.
+        pool_size=5,
+        max_overflow=5,
         pool_recycle=300,
         pool_pre_ping=True,
         pool_timeout=30,
@@ -95,9 +98,12 @@ def ping_database() -> dict:
         conn.execute(text("SELECT 1"))
     latency = (time.perf_counter() - t0) * 1000
     pool = engine.pool
+    host = engine.url.host  # never the full URL: it carries the password
     return {
         "status": "connected",
         "backend": DB_BACKEND,
+        "provider": "supabase" if host and "supabase" in host else ("sqlite" if DB_BACKEND.startswith("sqlite") else "postgresql"),
+        "host": host,
         "using_fallback": DB_BACKEND == "sqlite-fallback",
         "fallback_reason": DB_FALLBACK_REASON,
         "latency_ms": round(latency, 2),

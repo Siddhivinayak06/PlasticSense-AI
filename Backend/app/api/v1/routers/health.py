@@ -15,16 +15,31 @@ def health_check():
         from app.infrastructure.database.session import ping_database
         db_info = ping_database()
     except Exception as e:
-        db_info = {"status": "error", "error": str(e)}
+        # Exception text from the driver can include host names; keep it server-side.
+        from app.core.logging import logger
+        logger.error(f"Health check database ping failed: {e}")
+        db_info = {"status": "error", "error": type(e).__name__}
 
-    is_healthy = db_info and db_info.get("status") == "connected"
+    from app.api.dependencies import model_status
+    models = model_status()
+
+    is_healthy = (
+        db_info
+        and db_info.get("status") == "connected"
+        # Running on the SQLite fallback means the configured database is down.
+        and not db_info.get("using_fallback")
+        and models["detector_weights_present"]
+        and models["segmenter_weights_present"]
+    )
     return {
         "status": "ok" if is_healthy else "degraded",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
         "database": db_info,
-        "model_loaded": True,
+        # "loaded" is false until the first analysis request loads the models.
+        "models": models,
+        "model_loaded": models["loaded"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

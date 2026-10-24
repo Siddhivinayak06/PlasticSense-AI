@@ -16,6 +16,8 @@ export interface NGOModel {
   performance_score: number;
   avg_completion_days: number;
   specializations: string[];
+  /** Seeded demonstration record with fictional contact details. */
+  is_sample: boolean;
 }
 
 export async function fetchNGOs(): Promise<NGOModel[]> {

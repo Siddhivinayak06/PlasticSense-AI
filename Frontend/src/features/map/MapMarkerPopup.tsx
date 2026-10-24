@@ -2,7 +2,7 @@
 
 import { Popup } from 'react-leaflet';
 import Link from 'next/link';
-import { Target, Calendar, MapPin, Users, Layers, ShieldAlert, Percent, Eye } from 'lucide-react';
+import { Calendar, MapPin, Layers, ShieldAlert, Percent, Eye } from 'lucide-react';
 import type { Report } from '@/types/report';
 import { severityConfig, statusConfig } from '@/constants/reports';
 import { cn } from '@/lib/utils';
@@ -100,12 +100,19 @@ export function MapMarkerPopup({ report }: MapMarkerPopupProps) {
            </div>
         </div>
 
-        <Link href={`/history/${report.id}`} className="mt-1 block">
-          <Button variant="default" size="sm" className="w-full text-xs h-8 gap-1.5 font-medium">
-            <Eye className="size-3.5" />
-            View Full Report Details
-          </Button>
-        </Link>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          <Link href={`/map/locations/${report.id}`} className="block">
+            <Button variant="outline" size="sm" className="w-full text-xs h-8 font-medium">
+              Location
+            </Button>
+          </Link>
+          <Link href={`/history/${report.id}`} className="block">
+            <Button variant="default" size="sm" className="w-full text-xs h-8 gap-1.5 font-medium">
+              <Eye className="size-3.5" aria-hidden="true" />
+              Full Report
+            </Button>
+          </Link>
+        </div>
       </div>
     </Popup>
   );

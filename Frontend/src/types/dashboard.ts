@@ -15,8 +15,11 @@ export interface DashboardStat {
   label: string;
   value: number;
   icon: LucideIcon;
-  change: number; // percentage change, positive or negative
+  /** Week-over-week % change from real daily counts; null when not measurable. */
+  change: number | null;
   trend: 'up' | 'down' | 'neutral';
+  /** Real daily values for the sparkline; omitted when no daily series exists. */
+  sparkline?: number[];
   color: string; // tailwind color class for the icon bg
   iconColor: string; // tailwind color class for the icon itself
 }

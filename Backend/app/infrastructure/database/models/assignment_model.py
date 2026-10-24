@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Text
+from sqlalchemy import Boolean, Column, String, Integer, Float, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 
 from app.infrastructure.database.session import Base
@@ -30,6 +30,8 @@ class CleanupAssignmentModel(Base):
     notes = Column(Text, nullable=True)
     before_image_url = Column(String(512), nullable=True)
     after_image_url = Column(String(512), nullable=True)
+    # True for seeded demonstration records; the UI labels them as samples.
+    is_sample = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

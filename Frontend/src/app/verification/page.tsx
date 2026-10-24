@@ -1,29 +1,28 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   ShieldCheck,
-  CheckCircle,
-  XCircle,
-  Eye,
   Calendar,
   Building2,
   Upload,
   Loader2,
-  Percent,
   Sparkles,
-  ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchAssignments, verifyAssignment, updateAssignment, type AssignmentItem } from '@/services/assignments';
+import { fetchAssignments, verifyAssignment } from '@/services/assignments';
+import { apiErrorMessage } from '@/lib/api';
+import { QueryError } from '@/components/shared/QueryError';
+import { toast } from 'sonner';
 import { resolveImageUrl } from '@/services/detection';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import Link from 'next/link';
 
 export default function VerificationPage() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
@@ -34,7 +33,9 @@ export default function VerificationPage() {
 
   const queryClient = useQueryClient();
 
-  const { data: assignments, isLoading } = useQuery({
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  const { data: assignments, isLoading, isError, refetch } = useQuery({
     queryKey: ['assignments'],
     queryFn: () => fetchAssignments(),
   });
@@ -43,23 +44,18 @@ export default function VerificationPage() {
     mutationFn: async ({ id, file, notes }: { id: string; file: File; notes?: string }) => {
       return verifyAssignment(id, file, notes);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assignments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
-      queryClient.invalidateQueries({ queryKey: ['impact'] });
+    onSuccess: (res) => {
+      for (const key of ['assignments', 'assignment', 'dashboardSummary', 'impact', 'hotspots', 'analytics-insights']) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+      if (res.status === 'verified') {
+        toast.success('Cleanup verified', { description: `${res.waste_reduction_percent}% fewer detected objects.` });
+      } else {
+        toast.warning('Verification did not pass', { description: `Only ${res.waste_reduction_percent}% fewer detected objects; at least 50% is required.` });
+      }
       setVerifyingId(null);
       setSelectedFile(null);
       setVerificationNotes('');
-    },
-  });
-
-  const statusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      return updateAssignment(id, { status: status as any });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assignments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
     },
   });
 
@@ -86,9 +82,18 @@ export default function VerificationPage() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+    const f = e.target.files?.[0];
+    setFileError(null);
+    if (!f) return;
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/bmp'].includes(f.type)) {
+      setFileError('Choose a JPG, PNG, WEBP or BMP image.');
+      return;
     }
+    if (f.size > 10 * 1024 * 1024) {
+      setFileError('Image must be 10 MB or smaller.');
+      return;
+    }
+    setSelectedFile(f);
   };
 
   const handleRunAiVerification = (id: string) => {
@@ -103,7 +108,8 @@ export default function VerificationPage() {
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/bmp"
+        aria-label="Post-cleanup photo"
         className="hidden"
       />
 
@@ -115,7 +121,7 @@ export default function VerificationPage() {
             Cleanup Verification
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Review completed cleanups, upload post-cleanup images, and verify waste reduction with dual-model AI.
+            Upload an after-cleanup photo; the models count remaining objects and verify the cleanup when detections fall by at least 50%.
           </p>
         </div>
         {pendingCount > 0 && (
@@ -128,10 +134,11 @@ export default function VerificationPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {(['all', 'pending', 'verified', 'rejected'] as const).map((f) => (
           <Button
             key={f}
+            aria-pressed={filter === f}
             variant={filter === f ? 'default' : 'outline'}
             size="sm"
             onClick={() => setFilter(f)}
@@ -143,7 +150,9 @@ export default function VerificationPage() {
       </div>
 
       {/* Verification list */}
-      {isLoading ? (
+      {isError ? (
+        <QueryError onRetry={() => refetch()} />
+      ) : isLoading ? (
         <div className="flex h-64 items-center justify-center rounded-2xl border border-border/50 bg-muted/20">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
@@ -157,9 +166,10 @@ export default function VerificationPage() {
         <div className="space-y-4">
           {filtered.map((item, index) => {
             const isVerifying = verifyingId === item.id;
-            const wasteBefore = item.waste_before || item.waste_count || 1;
-            const wasteAfter = item.waste_after ?? (item.status === 'verified' ? 0 : null);
-            const reduction = item.waste_reduction_percent ?? (item.status === 'verified' ? 100 : null);
+            // Only measured values: no defaults that would read as results.
+            const wasteBefore = item.waste_before;
+            const wasteAfter = item.waste_after ?? null;
+            const reduction = item.waste_reduction_percent ?? null;
 
             return (
               <motion.div
@@ -210,16 +220,16 @@ export default function VerificationPage() {
                   <div className="rounded-xl bg-muted/30 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground uppercase font-medium">After</p>
                     <p className="text-lg font-bold text-foreground">
-                      {wasteAfter != null ? wasteAfter : 'Awaiting Photo'}
+                      {wasteAfter != null ? wasteAfter : '—'}
                     </p>
                     <p className="text-[10px] text-muted-foreground">remaining debris</p>
                   </div>
                   <div className="rounded-xl bg-emerald-500/5 border border-emerald-200/50 dark:border-emerald-800/50 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground uppercase font-medium">Waste Reduction</p>
                     <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                      {reduction != null ? `${reduction}%` : 'Pending AI'}
+                      {reduction != null ? `${reduction}%` : '—'}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">surface cleared</p>
+                    <p className="text-[10px] text-muted-foreground">fewer detected objects</p>
                   </div>
                   <div className="rounded-xl bg-muted/30 p-3 text-center">
                     <p className="text-[10px] text-muted-foreground uppercase font-medium">Risk Score</p>
@@ -235,6 +245,7 @@ export default function VerificationPage() {
                       <div className="space-y-1">
                         <span className="text-[11px] font-semibold text-muted-foreground">Pre-Cleanup Image</span>
                         <div className="h-40 rounded-xl overflow-hidden bg-muted/40 border border-border/40">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- served by the API / Supabase Storage */}
                           <img
                             src={resolveImageUrl(item.before_image_url)}
                             alt="Pre-cleanup"
@@ -246,9 +257,10 @@ export default function VerificationPage() {
                     {item.after_image_url && (
                       <div className="space-y-1">
                         <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                          Post-Cleanup Verified Mask
+                          Post-Cleanup (AI-annotated)
                         </span>
                         <div className="h-40 rounded-xl overflow-hidden bg-muted/40 border border-emerald-500/30">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- served by the API / Supabase Storage */}
                           <img
                             src={resolveImageUrl(item.after_image_url)}
                             alt="Post-cleanup verified"
@@ -329,6 +341,12 @@ export default function VerificationPage() {
                         Cancel
                       </Button>
                     </div>
+                    {fileError && <p className="text-xs text-destructive">{fileError}</p>}
+                    {verifyMutation.isError && (
+                      <p role="alert" className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2">
+                        {apiErrorMessage(verifyMutation.error)}
+                      </p>
+                    )}
                   </motion.div>
                 )}
 
@@ -344,24 +362,9 @@ export default function VerificationPage() {
                       <Upload className="size-3.5" />
                       Upload Post-Cleanup Photo
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => statusMutation.mutate({ id: item.id, status: 'verified' })}
-                    >
-                      <CheckCircle className="size-3.5 text-emerald-500" />
-                      Approve Cleanup
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-destructive hover:text-destructive"
-                      onClick={() => statusMutation.mutate({ id: item.id, status: 'rejected' })}
-                    >
-                      <XCircle className="size-3.5" />
-                      Reject Cleanup
-                    </Button>
+                    <Link href={`/assignments/${item.id}`}>
+                      <Button variant="outline" size="sm">Open assignment</Button>
+                    </Link>
                   </div>
                 )}
               </motion.div>

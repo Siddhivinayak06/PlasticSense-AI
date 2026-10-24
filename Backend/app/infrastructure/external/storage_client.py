@@ -16,6 +16,8 @@ except ImportError:  # pragma: no cover - depends on local environment
 
 logger = logging.getLogger(__name__)
 
+SAFE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+
 class StorageClient:
     def __init__(self, upload_dir: Optional[str] = None, url_prefix: Optional[str] = None):
         """
@@ -45,9 +47,14 @@ class StorageClient:
         else:
             os.makedirs(self.upload_dir, exist_ok=True)
     def save_file(self, file_bytes: bytes, original_filename: str) -> str:
-        ext = os.path.splitext(original_filename)[1].lower()
+        # Only the basename's extension is used and the name itself is a fresh UUID,
+        # so client input can never choose the path (no traversal) or a servable
+        # non-image type (e.g. .html/.svg) under the static media mounts.
+        ext = os.path.splitext(os.path.basename(original_filename or ""))[1].lower()
         if not ext:
             ext = ".jpg"
+        if ext not in SAFE_EXTENSIONS:
+            raise ValueError(f"Refusing to store file with extension '{ext}'")
         unique_filename = f"{uuid.uuid4().hex}{ext}"
         
         if self.use_supabase:
@@ -56,7 +63,7 @@ class StorageClient:
                 response = self.supabase.storage.from_(self.bucket_name).upload(
                     file=file_bytes,
                     path=unique_filename,
-                    file_options={"content-type": f"image/{ext.lstrip('.')}"}
+                    file_options={"content-type": {".jpg": "image/jpeg", ".jpeg": "image/jpeg"}.get(ext, f"image/{ext.lstrip('.')}")}
                 )
                 
                 # Get public URL

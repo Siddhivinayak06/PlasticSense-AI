@@ -1,129 +1,266 @@
 'use client';
 
-import { use } from 'react';
+import { use, useMemo } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MapPin, Navigation, Info, AlertTriangle, Users, Target } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
+import { ArrowLeft, MapPin, Navigation, Info, Target, ClipboardList, Flame, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { mockMapReports } from '@/mock/map';
-import { severityConfig, statusConfig, priorityConfig } from '@/constants/reports';
-import { ReportStatusTimeline } from '@/features/reports/ReportStatusTimeline';
-import { cn } from '@/lib/utils';
-import dynamic from 'next/dynamic';
+import { PageLoader } from '@/components/shared/PageLoader';
+import { DataNote, QueryError } from '@/components/shared/QueryError';
+import { SeverityBadge } from '@/components/shared/SeverityBadge';
+import { CreateAssignmentDialog } from '@/features/assignments/CreateAssignmentDialog';
+import { fetchDetection, fetchMapDetections, resolveImageUrl } from '@/services/detection';
+import { fetchHotspots } from '@/services/hotspots';
+import type { Detection } from '@/types/detection';
+import type { MiniMapSeverity } from '@/features/map/StaticMiniMap';
 
-const StaticMiniMap = dynamic(() => import('@/features/map/StaticMiniMap'), { ssr: false, loading: () => <div className="h-full w-full bg-slate-900/50 animate-pulse" /> });
+const StaticMiniMap = dynamic(() => import('@/features/map/StaticMiniMap'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-muted/40 animate-pulse" />,
+});
+
+const NEARBY_RADIUS_M = 2500;
+
+function haversineM(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6_371_000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dPhi = toRad(lat2 - lat1);
+  const dLambda = toRad(lon2 - lon1);
+  const a = Math.sin(dPhi / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLambda / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function severityOf(d: Detection): MiniMapSeverity {
+  const level = String(d.risk?.level ?? '').toLowerCase();
+  return level === 'low' || level === 'medium' || level === 'high' || level === 'critical' ? level : 'unknown';
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  manual: 'Entered manually',
+  user_provided: 'Entered manually',
+  image_exif: 'Photo EXIF GPS',
+  image_overlay_ocr: 'Read from on-image GPS overlay (OCR)',
+  unavailable: 'Not available',
+};
 
 export default function ReportLocationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  // Find report in either map mock or regular reports mock (try map first)
-  const report = mockMapReports.find((r) => r.id === id);
+  const detectionQuery = useQuery({ queryKey: ['detection', id], queryFn: () => fetchDetection(id), retry: false });
+  const mapQuery = useQuery({ queryKey: ['map-detections'], queryFn: fetchMapDetections });
+  const hotspotsQuery = useQuery({ queryKey: ['hotspots'], queryFn: fetchHotspots });
 
-  if (!report) {
+  const detection = detectionQuery.data?.data;
+
+  const nearby = useMemo(() => {
+    if (!detection || detection.latitude == null || detection.longitude == null) return [];
+    return (mapQuery.data?.detections ?? [])
+      .filter((d) => d.id !== detection.id && d.latitude != null && d.longitude != null)
+      .map((d) => ({ d, distance: haversineM(detection.latitude!, detection.longitude!, d.latitude!, d.longitude!) }))
+      .filter((x) => x.distance <= NEARBY_RADIUS_M)
+      .sort((a, b) => a.distance - b.distance);
+  }, [detection, mapQuery.data]);
+
+  const hotspot = hotspotsQuery.data?.hotspots.find((h) => h.detection_ids.includes(id));
+
+  if (detectionQuery.isLoading) return <PageLoader label="Loading location…" />;
+
+  if (detectionQuery.isError || !detection) {
+    const notFound = isAxiosError(detectionQuery.error) && detectionQuery.error.response?.status === 404;
+    if (!notFound) return <QueryError onRetry={() => detectionQuery.refetch()} />;
     return (
-      <div className="max-w-[1600px] mx-auto pt-10">
-        <EmptyState title="Location Not Found" description={`We couldn't find a map report with ID ${id}.`} />
-        <div className="flex justify-center mt-4">
-           <Link href="/map"><Button variant="outline">Return to Map</Button></Link>
+      <div className="max-w-xl mx-auto pt-10 space-y-4">
+        <EmptyState title="Report not found" description={`No report exists with ID ${id}.`} />
+        <div className="flex justify-center">
+          <Link href="/map"><Button variant="outline">Return to Map</Button></Link>
         </div>
       </div>
     );
   }
 
-  // Find nearby reports in map data (rough distance calc)
-  const nearbyReports = mockMapReports.filter(r => r.id !== report.id && r.city === report.city).slice(0, 3);
+  const hasLocation = detection.latitude != null && detection.longitude != null;
+  const severity = severityOf(detection);
+  const avgConfidence = detection.items.length
+    ? Math.round((detection.items.reduce((s, i) => s + i.confidence, 0) / detection.items.length) * 100)
+    : null;
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
-      {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link href="/map">
-            <Button variant="ghost" size="icon" className="shrink-0"><ArrowLeft className="size-4" /></Button>
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/map" aria-label="Back to map">
+            <Button variant="ghost" size="icon" className="shrink-0"><ArrowLeft className="size-4" aria-hidden="true" /></Button>
           </Link>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-bold text-foreground">Location Details: {report.id}</h1>
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">{report.address}</p>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-foreground">Report Location</h1>
+            <p className="text-sm text-muted-foreground mt-0.5 font-mono truncate">{detection.id}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-           <Button variant="outline" size="sm" className="gap-1.5"><Navigation className="size-3.5" /> Navigate</Button>
-           <Button variant="default" size="sm" className="gap-1.5"><AlertTriangle className="size-3.5" /> Escalate</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasLocation && (
+            <a
+              href={`https://www.openstreetmap.org/?mlat=${detection.latitude}&mlon=${detection.longitude}#map=17/${detection.latitude}/${detection.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Navigation className="size-3.5" aria-hidden="true" /> Open in OpenStreetMap
+                <ExternalLink className="size-3" aria-hidden="true" />
+              </Button>
+            </a>
+          )}
+          {detection.detection_status === 'completed' && (
+            <CreateAssignmentDialog
+              target={{
+                kind: 'report',
+                detectionId: detection.id,
+                name: hasLocation ? `Report near ${detection.latitude!.toFixed(4)}, ${detection.longitude!.toFixed(4)}` : `Report ${detection.id.slice(0, 8)}`,
+                lat: detection.latitude,
+                lng: detection.longitude,
+                riskScore: detection.risk?.score ?? null,
+                wasteCount: detection.items.length,
+              }}
+              trigger={
+                <Button size="sm" className="gap-1.5">
+                  <ClipboardList className="size-3.5" aria-hidden="true" /> Create Assignment
+                </Button>
+              }
+            />
+          )}
         </div>
       </motion.div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left Column - Map & Imagery */}
         <div className="xl:col-span-2 space-y-6">
           <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }} className="relative h-80 rounded-2xl overflow-hidden glass p-1 shadow-md">
-             <div className="absolute inset-1 rounded-xl overflow-hidden">
-                <StaticMiniMap lat={report.lat} lng={report.lng} severity={report.severity} />
-             </div>
-             <div className="absolute top-4 left-4 glass px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-2">
-                <MapPin className="size-4 text-red-500" />
-                <span className="text-xs font-mono font-bold text-foreground">{report.lat.toFixed(6)}, {report.lng.toFixed(6)}</span>
-             </div>
+            {hasLocation ? (
+              <>
+                <div className="absolute inset-1 rounded-xl overflow-hidden">
+                  <StaticMiniMap
+                    lat={detection.latitude!}
+                    lng={detection.longitude!}
+                    severity={severity}
+                    zoom={nearby.length ? 14 : 16}
+                    interactive
+                    points={nearby.map(({ d, distance }) => ({
+                      id: d.id,
+                      lat: d.latitude!,
+                      lng: d.longitude!,
+                      severity: severityOf(d),
+                      label: `${Math.round(distance)} m away · ${d.items.length} objects`,
+                    }))}
+                  />
+                </div>
+                <div className="absolute top-4 left-4 z-[500] glass px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-2">
+                  <MapPin className="size-4 text-red-500" aria-hidden="true" />
+                  <span className="text-xs font-mono font-bold text-foreground">
+                    {detection.latitude!.toFixed(6)}, {detection.longitude!.toFixed(6)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="h-full flex items-center justify-center p-6">
+                <EmptyState
+                  title="No location for this report"
+                  description="The image had no EXIF GPS or readable overlay, and no coordinates were entered."
+                />
+              </div>
+            )}
           </motion.div>
 
-          {/* Details Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass rounded-2xl p-5 flex flex-col items-center justify-center bg-muted/20">
-                <img src={report.imageUrl} alt={report.plasticTypeLabel} className="h-40 w-auto object-contain drop-shadow-xl mb-4" />
-                <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold border', severityConfig[report.severity].bg, severityConfig[report.severity].color)}>
-                  {severityConfig[report.severity].label} Severity
-                </span>
-             </motion.div>
-             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="glass rounded-2xl p-5 space-y-4">
-                <h3 className="text-sm font-semibold flex items-center gap-2"><Info className="size-4 text-muted-foreground" /> Detection Summary</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Plastic Type</span>
-                    <span className="font-semibold text-foreground">{report.plasticTypeLabel}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">AI Confidence</span>
-                    <span className="font-semibold text-primary">{report.confidence}%</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Detected Objects</span>
-                    <span className="font-semibold text-foreground">{report.detectedObjects}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm pt-2 border-t border-border/50">
-                    <span className="text-muted-foreground">Cleanup Priority</span>
-                    <span className={cn('text-xs font-bold px-2 py-0.5 rounded-full border', priorityConfig[report.cleanupPriority].bg, priorityConfig[report.cleanupPriority].color)}>
-                      {priorityConfig[report.cleanupPriority].label}
-                    </span>
-                  </div>
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass rounded-2xl p-3 flex flex-col items-center justify-center bg-muted/20">
+              {/* eslint-disable-next-line @next/next/no-img-element -- served by the API / Supabase Storage */}
+              <img
+                src={resolveImageUrl(detection.annotated_image_url || detection.image_url)}
+                alt={`Annotated analysis of report ${detection.id.slice(0, 8)}`}
+                className="max-h-56 w-auto rounded-lg object-contain"
+              />
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="glass rounded-2xl p-5 space-y-4">
+              <h2 className="text-sm font-semibold flex items-center gap-2"><Info className="size-4 text-muted-foreground" aria-hidden="true" /> Detection Summary</h2>
+              <dl className="space-y-3 text-sm">
+                <div className="flex justify-between items-center">
+                  <dt className="text-muted-foreground">Risk</dt>
+                  <dd>
+                    {severity === 'unknown'
+                      ? <span className="font-semibold text-muted-foreground">Not assessed</span>
+                      : <span className="flex items-center gap-2"><SeverityBadge severity={severity} size="sm" /> <span className="font-semibold">{Math.round(detection.risk!.score)}/100</span></span>}
+                  </dd>
                 </div>
-             </motion.div>
+                <div className="flex justify-between items-center">
+                  <dt className="text-muted-foreground">Detected objects</dt>
+                  <dd className="font-semibold">{detection.items.length}</dd>
+                </div>
+                <div className="flex justify-between items-center">
+                  <dt className="text-muted-foreground">Mean confidence</dt>
+                  <dd className="font-semibold">{avgConfidence === null ? '—' : `${avgConfidence}%`}</dd>
+                </div>
+                <div className="flex justify-between items-center gap-4">
+                  <dt className="text-muted-foreground">Location source</dt>
+                  <dd className="font-semibold text-right">{SOURCE_LABEL[detection.location_source ?? 'unavailable'] ?? detection.location_source}</dd>
+                </div>
+                <div className="flex justify-between items-center">
+                  <dt className="text-muted-foreground">Photo taken</dt>
+                  <dd className="font-semibold">{detection.captured_at ? new Date(detection.captured_at).toLocaleString() : 'Unknown (no EXIF time)'}</dd>
+                </div>
+                <div className="flex justify-between items-center">
+                  <dt className="text-muted-foreground">Uploaded</dt>
+                  <dd className="font-semibold">{new Date(detection.created_at).toLocaleString()}</dd>
+                </div>
+              </dl>
+              <Link href={`/history/${detection.id}`} className="block">
+                <Button variant="outline" size="sm" className="w-full">Open full report</Button>
+              </Link>
+            </motion.div>
           </div>
         </div>
 
-        {/* Right Column - Status & Nearby */}
         <div className="space-y-6">
-           <ReportStatusTimeline report={report} />
-           
-           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass rounded-2xl p-5">
-             <h3 className="text-sm font-semibold flex items-center gap-2 mb-4"><Target className="size-4 text-muted-foreground" /> Nearby Reports</h3>
-             <div className="space-y-3">
-               {nearbyReports.map(r => (
-                 <Link key={r.id} href={`/map/locations/${r.id}`}>
-                   <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/40 transition-colors border border-transparent hover:border-border/50">
-                     <div className="size-10 rounded-lg bg-muted/60 flex items-center justify-center shrink-0">
-                       <img src={r.imageUrl} className="size-6 object-contain opacity-70" />
-                     </div>
-                     <div className="flex-1 min-w-0">
-                       <p className="text-xs font-bold text-foreground truncate">{r.plasticTypeLabel}</p>
-                       <p className="text-[10px] text-muted-foreground truncate">{r.address}</p>
-                     </div>
-                     <span className={cn('size-2.5 rounded-full shrink-0', r.severity === 'critical' ? 'bg-red-500' : r.severity === 'high' ? 'bg-orange-500' : 'bg-amber-400')} />
-                   </div>
-                 </Link>
-               ))}
-             </div>
-           </motion.div>
+          {hotspot && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="glass rounded-2xl p-5">
+              <h2 className="text-sm font-semibold flex items-center gap-2 mb-2"><Flame className="size-4 text-orange-500" aria-hidden="true" /> Part of a hotspot</h2>
+              <p className="text-sm text-muted-foreground">
+                {hotspot.report_count} reports · {hotspot.total_waste_objects} objects · cleanup {hotspot.status.replace('_', ' ')}
+              </p>
+              <Link href={`/hotspots/${encodeURIComponent(hotspot.id)}`} className="block mt-3">
+                <Button variant="secondary" size="sm" className="w-full">View hotspot</Button>
+              </Link>
+            </motion.div>
+          )}
+
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass rounded-2xl p-5">
+            <h2 className="text-sm font-semibold flex items-center gap-2 mb-4"><Target className="size-4 text-muted-foreground" aria-hidden="true" /> Nearby Reports (within 2.5 km)</h2>
+            {!hasLocation ? (
+              <p className="text-sm text-muted-foreground">Unavailable without coordinates.</p>
+            ) : nearby.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No other geolocated reports nearby.</p>
+            ) : (
+              <ul className="space-y-2">
+                {nearby.slice(0, 8).map(({ d, distance }) => (
+                  <li key={d.id}>
+                    <Link href={`/map/locations/${d.id}`} className="flex items-center justify-between gap-3 p-2.5 rounded-xl hover:bg-muted/40 transition-colors border border-transparent hover:border-border/50">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-foreground">{distance < 1000 ? `${Math.round(distance)} m` : `${(distance / 1000).toFixed(1)} km`} away</p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {new Date(d.created_at).toLocaleDateString()} · {d.items.length} objects
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-semibold capitalize text-muted-foreground">{severityOf(d) === 'unknown' ? 'not assessed' : severityOf(d)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </motion.div>
+
+          <DataNote>
+            Coordinates come from the photo itself or manual entry. No street address is shown because reverse geocoding is not
+            configured.
+          </DataNote>
         </div>
       </div>
     </div>

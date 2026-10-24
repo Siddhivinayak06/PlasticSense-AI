@@ -16,6 +16,7 @@ def seed_ngos_and_assignments(db: Session):
             logger.info("Seeding initial NGO teams...")
             initial_ngos = [
                 NGOTeamModel(
+                    is_sample=True,
                     id=str(uuid.uuid4()),
                     name="Clean Ocean Foundation",
                     city="Mumbai",
@@ -33,6 +34,7 @@ def seed_ngos_and_assignments(db: Session):
                     specializations=["Coastline", "Microplastics", "River Mouths"],
                 ),
                 NGOTeamModel(
+                    is_sample=True,
                     id=str(uuid.uuid4()),
                     name="Green Earth Volunteers",
                     city="Chennai",
@@ -50,6 +52,7 @@ def seed_ngos_and_assignments(db: Session):
                     specializations=["Beaches", "Estuaries", "Urban Canals"],
                 ),
                 NGOTeamModel(
+                    is_sample=True,
                     id=str(uuid.uuid4()),
                     name="Coastal Care Taskforce",
                     city="Panaji",
@@ -67,6 +70,7 @@ def seed_ngos_and_assignments(db: Session):
                     specializations=["Tourist Beaches", "Mangroves"],
                 ),
                 NGOTeamModel(
+                    is_sample=True,
                     id=str(uuid.uuid4()),
                     name="River Watchers Alliance",
                     city="Kolkata",
@@ -84,6 +88,7 @@ def seed_ngos_and_assignments(db: Session):
                     specializations=["Ganges Estuary", "Industrial Runoff"],
                 ),
                 NGOTeamModel(
+                    is_sample=True,
                     id=str(uuid.uuid4()),
                     name="Eco Warriors India",
                     city="Kochi",

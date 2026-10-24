@@ -61,13 +61,13 @@ export function MapToolbar({ overlays, toggleOverlay, onReset, onLocate, onDownl
       </div>
 
       <div className="flex items-center gap-1 glass p-1.5 rounded-xl pointer-events-auto shadow-sm">
-        <Button variant="ghost" size="icon-sm" onClick={onLocate} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon-sm" onClick={onLocate} aria-label="Centre on reports" title="Centre on reports" className="h-8 w-8 text-muted-foreground hover:text-foreground">
           <Navigation className="size-4" />
         </Button>
-        <Button variant="ghost" size="icon-sm" onClick={onReset} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon-sm" onClick={onReset} aria-label="Reset filters" title="Reset filters" className="h-8 w-8 text-muted-foreground hover:text-foreground">
           <RefreshCcw className="size-4" />
         </Button>
-        <Button variant="ghost" size="icon-sm" onClick={onDownload} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon-sm" onClick={onDownload} aria-label="Export visible reports as CSV" title="Export visible reports (CSV)" className="h-8 w-8 text-muted-foreground hover:text-foreground">
           <Download className="size-4" />
         </Button>
       </div>

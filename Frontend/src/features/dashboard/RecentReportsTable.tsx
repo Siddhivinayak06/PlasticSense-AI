@@ -17,7 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { cardEntrance, tableRowVariants, containerStaggerFast, microInteractions } from '@/lib/motion';
+import { cardEntrance, tableRowVariants } from '@/lib/motion';
 
 const statusConfig: Record<string, string> = {
   pending: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200/50 dark:border-amber-800/50',

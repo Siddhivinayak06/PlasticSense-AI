@@ -1,10 +1,24 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Calendar, Activity, ShieldCheck, Sparkles } from 'lucide-react';
+import { Calendar, Activity, ShieldCheck } from 'lucide-react';
 import { cardEntrance, microInteractions } from '@/lib/motion';
+import { useQuery } from '@tanstack/react-query';
+import { fetchHealth } from '@/services/analytics';
 
 export function WelcomeCard() {
+  const { data: health, isError: healthError } = useQuery({ queryKey: ['health'], queryFn: fetchHealth, refetchInterval: 30_000 });
+  const db = health?.database;
+  const dbOk = db?.status === 'connected' && !db.using_fallback;
+  const dbLabel = !db
+    ? 'Database: checking…'
+    : db.status !== 'connected'
+      ? 'Database unavailable'
+      : db.using_fallback
+        ? 'Database: local SQLite fallback'
+        : db.provider === 'supabase'
+          ? 'Database: Supabase connected'
+          : `Database: ${db.provider ?? db.backend}`;
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
@@ -40,7 +54,7 @@ export function WelcomeCard() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
               <span className="relative inline-flex rounded-full size-2 bg-primary"></span>
             </span>
-            <span>Neural Watchtower · System Online</span>
+            <span>{health ? (health.status === 'ok' ? 'All systems operational' : 'Running degraded') : healthError ? 'API unreachable' : 'Checking system…'}</span>
           </motion.div>
 
           <motion.h1
@@ -51,7 +65,7 @@ export function WelcomeCard() {
           >
             {greeting},{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-emerald-500 to-cyan-500">
-              Admin
+              Operator
             </span>
           </motion.h1>
 
@@ -61,7 +75,7 @@ export function WelcomeCard() {
             transition={{ duration: 0.45, delay: 0.2 }}
             className="text-muted-foreground text-sm sm:text-base mb-6 sm:mb-8 leading-relaxed max-w-xl font-normal"
           >
-            WasteSense dual-model AI is actively mapping plastic accumulation zones, classifying polymer streams, and dispatching remediation missions.
+            Upload field photos to detect waste with two AI models, assess site risk, map hotspots, and track cleanups through AI-verified completion.
           </motion.p>
 
           {/* Interactive Status Chips */}
@@ -85,8 +99,8 @@ export function WelcomeCard() {
               whileTap={microInteractions.tapSubtleScale}
               className="flex items-center gap-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 bg-white/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 px-3.5 py-2 rounded-xl shadow-xs"
             >
-              <Activity className="size-4 text-emerald-500" />
-              <span>Real-Time Hotspots Monitored</span>
+              <Activity className={`size-4 ${health?.status === 'ok' ? 'text-emerald-500' : 'text-amber-500'}`} aria-hidden="true" />
+              <span>{health ? (health.status === 'ok' ? 'API & models ready' : 'API degraded') : healthError ? 'API unreachable' : 'Checking API…'}</span>
             </motion.div>
 
             <motion.div
@@ -94,8 +108,8 @@ export function WelcomeCard() {
               whileTap={microInteractions.tapSubtleScale}
               className="flex items-center gap-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 bg-white/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 px-3.5 py-2 rounded-xl shadow-xs"
             >
-              <ShieldCheck className="size-4 text-blue-500" />
-              <span>Supabase Connection Active</span>
+              <ShieldCheck className={`size-4 ${dbOk ? 'text-blue-500' : 'text-amber-500'}`} aria-hidden="true" />
+              <span>{dbLabel}</span>
             </motion.div>
           </motion.div>
         </div>

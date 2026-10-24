@@ -7,7 +7,12 @@ from alembic import context
 # Add current directory to sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.infrastructure.database.session import Base, database_url as resolved_database_url
+from app.infrastructure.database.session import (
+    Base,
+    DB_BACKEND,
+    DB_FALLBACK_REASON,
+    database_url as resolved_database_url,
+)
 # Import every model module so Base.metadata is complete for autogenerate.
 from app.infrastructure.database import models  # noqa: F401
 
@@ -25,7 +30,18 @@ def get_url():
     session.py falls back to local SQLite when the configured PostgreSQL server is
     unreachable. Alembic must migrate the database the app actually uses, otherwise
     migrations silently target a server that is not there.
+
+    The reverse is also dangerous: if DATABASE_URL is configured but unreachable, an
+    `alembic upgrade` would quietly migrate the SQLite fallback and report success.
+    Refuse that case; set DB_FORCE_SQLITE=true to migrate SQLite deliberately.
     """
+    if DB_BACKEND == "sqlite-fallback" and os.environ.get("ALEMBIC_ALLOW_FALLBACK") != "1":
+        raise SystemExit(
+            f"Refusing to migrate: the configured database is unreachable ({DB_FALLBACK_REASON}) "
+            "and the app fell back to local SQLite. Fix DATABASE_URL, or set DB_FORCE_SQLITE=true "
+            "to migrate SQLite on purpose."
+        )
+    print(f"[alembic] target database backend: {DB_BACKEND}", file=sys.stderr)
     return resolved_database_url
 
 

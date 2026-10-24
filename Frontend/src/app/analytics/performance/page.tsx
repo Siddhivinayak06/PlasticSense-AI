@@ -1,22 +1,24 @@
 'use client';
 
-import { AIAnalyticsGrid } from '@/features/analytics/AIAnalyticsGrid';
+import { useQuery } from '@tanstack/react-query';
+import { ModelPerformanceGrid } from '@/features/analytics/ModelPerformanceGrid';
 import { CleanupPerformanceChart } from '@/features/analytics/CleanupPerformanceChart';
-import { mockAIAnalytics, mockCleanupPerformance } from '@/mock/analytics';
-import { PrototypeBanner } from '@/components/shared/PrototypeBanner';
+import { fetchModelInfo } from '@/services/analytics';
+import { useInsights, toCleanupPerformance } from '@/hooks/useInsights';
+import { PageLoader } from '@/components/shared/PageLoader';
+import { QueryError } from '@/components/shared/QueryError';
 
 export default function PerformanceMetricsPage() {
+  const insights = useInsights();
+  const modelInfo = useQuery({ queryKey: ['model-info'], queryFn: fetchModelInfo, staleTime: 5 * 60_000 });
+
+  if (insights.isLoading) return <PageLoader label="Computing performance metrics…" />;
+  if (insights.isError || !insights.data) return <QueryError onRetry={() => insights.refetch()} />;
+
   return (
     <div className="space-y-6">
-      <PrototypeBanner
-        feature="AI performance and cleanup-completion history"
-        requirement="Model accuracy metrics require a labelled evaluation set; cleanup history requires completed assignment records."
-      />
-      <AIAnalyticsGrid data={mockAIAnalytics} />
-      
-      <div className="grid grid-cols-1">
-        <CleanupPerformanceChart data={mockCleanupPerformance} />
-      </div>
+      <ModelPerformanceGrid performance={insights.data.model_performance} modelInfo={modelInfo.data} />
+      <CleanupPerformanceChart data={toCleanupPerformance(insights.data.cleanup_performance)} />
     </div>
   );
 }

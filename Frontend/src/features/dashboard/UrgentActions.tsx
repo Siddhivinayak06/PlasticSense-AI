@@ -22,7 +22,7 @@ interface UrgentHotspot {
   lastDetected: string;
   reportCount: number;
   cleanupStatus: string;
-  recommendedTeamSize: string;
+  assignedTeam?: string;
 }
 
 export function UrgentActions() {
@@ -33,19 +33,22 @@ export function UrgentActions() {
 
   const hotspots: UrgentHotspot[] = useMemo(() => {
     if (!data?.hotspots || data.hotspots.length === 0) return [];
+    // Only assessed, not-yet-closed clusters can be ranked by urgency.
     return data.hotspots
+      .filter((h) => h.max_risk_score !== null && h.severity !== 'unknown')
+      .filter((h) => h.status !== 'resolved' && h.status !== 'verified')
       .map((h) => ({
         id: h.id,
         name: h.name,
-        city: `Lat ${h.latitude.toFixed(3)}, Lng ${h.longitude.toFixed(3)}`,
-        severityScore: Math.round(h.max_risk_score),
-        severity: h.severity,
+        city: `${h.latitude.toFixed(4)}, ${h.longitude.toFixed(4)}`,
+        severityScore: Math.round(h.max_risk_score as number),
+        severity: h.severity as UrgentHotspot['severity'],
         wasteCount: h.total_waste_objects,
-        dominantWaste: `${h.most_common_material} Debris`,
-        lastDetected: 'Monitored',
+        dominantWaste: h.most_common_material,
+        lastDetected: h.last_updated,
         reportCount: h.report_count,
-        cleanupStatus: h.status,
-        recommendedTeamSize: `${Math.min(15, Math.max(3, Math.round(h.total_waste_objects / 2) + 2))} Members`,
+        cleanupStatus: h.status.replace('_', ' '),
+        assignedTeam: h.assigned_team ?? undefined,
       }))
       .sort((a, b) => b.severityScore - a.severityScore)
       .slice(0, 4);
@@ -137,29 +140,31 @@ export function UrgentActions() {
               </div>
               <div className="flex items-center justify-between">
                 <span>Reports:</span>
-                <span className="font-medium text-foreground">{hotspot.reportCount} sightings</span>
+                <span className="font-medium text-foreground">{hotspot.reportCount}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1">
-                  <Users className="size-3 text-muted-foreground/80" />
-                  Recommended Crew:
+                  <Users className="size-3 text-muted-foreground/80" aria-hidden="true" />
+                  Cleanup:
                 </span>
-                <span className="font-medium text-foreground">{hotspot.recommendedTeamSize}</span>
+                <span className="font-medium text-foreground capitalize truncate max-w-[60%]">
+                  {hotspot.assignedTeam ? `${hotspot.cleanupStatus} · ${hotspot.assignedTeam}` : hotspot.cleanupStatus}
+                </span>
               </div>
             </div>
 
             {/* Actions */}
             <div className="pt-1 flex gap-2">
-              <Link href={`/assignments?hotspot_id=${hotspot.id}`} className="flex-1">
+              <Link href={`/hotspots/${encodeURIComponent(hotspot.id)}`} className="flex-1">
                 <Button
                   variant="default"
                   size="xs"
                   className="w-full text-xs h-8 rounded-xl font-medium shadow-xs transition-transform active:scale-95"
                 >
-                  Deploy Team
+                  {hotspot.cleanupStatus === 'pending' ? 'Plan Cleanup' : 'View Progress'}
                 </Button>
               </Link>
-              <Link href="/hotspots">
+              <Link href={`/hotspots/${encodeURIComponent(hotspot.id)}`} aria-label={`Inspect ${hotspot.name}`}>
                 <Button
                   variant="outline"
                   size="xs"

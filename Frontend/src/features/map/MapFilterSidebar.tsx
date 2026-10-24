@@ -5,7 +5,7 @@ import { Filter, X, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { plasticTypeOptions, severityConfig, statusConfig, priorityConfig } from '@/constants/reports';
-import type { ReportFilters, ReportSeverity, PlasticType, FullReportStatus, CleanupPriority } from '@/types/report';
+import type { ReportFilters, ReportSeverity, FullReportStatus, CleanupPriority } from '@/types/report';
 import { cn } from '@/lib/utils';
 
 interface MapFilterSidebarProps {
@@ -13,7 +13,7 @@ interface MapFilterSidebarProps {
   onClose: () => void;
   filters: ReportFilters;
   setSearch: (s: string) => void;
-  toggleFilter: <K extends keyof ReportFilters>(key: K, value: any) => void;
+  toggleFilter: <K extends keyof ReportFilters>(key: K, value: string) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
 }

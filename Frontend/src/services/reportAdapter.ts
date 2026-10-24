@@ -56,7 +56,7 @@ function dominantClass(detection: Detection): string | null {
 }
 
 export function detectionToReport(detection: Detection): Report {
-  const risk = detection.risk ?? {};
+  const risk = detection.risk;
   const features = detection.features ?? {};
   const topClass = dominantClass(detection);
 
@@ -64,8 +64,8 @@ export function detectionToReport(detection: Detection): Report {
     ? detection.items.reduce((sum, i) => sum + i.confidence, 0) / detection.items.length
     : 0;
 
-  const severityRaw = String(risk.level ?? risk.severity ?? '').toLowerCase();
-  const priorityRaw = String(risk.cleanup_priority ?? '').toUpperCase();
+  const severityRaw = String(risk?.level ?? risk?.severity ?? '').toLowerCase();
+  const priorityRaw = String(risk?.cleanup_priority ?? '').toUpperCase();
 
   return {
     id: detection.id,
@@ -93,14 +93,14 @@ export function detectionToReport(detection: Detection): Report {
     address: UNKNOWN_FIELD,
     // No assignment workflow links detections to teams yet.
     assignedTeam: UNKNOWN_FIELD,
-    description: String(risk.explanation ?? ''),
+    description: String(risk?.explanation ?? ''),
     // Would require a hydrology layer; none is integrated.
     nearbyWaterBody: UNKNOWN_FIELD,
     disposalMethod: UNKNOWN_FIELD,
     statusHistory: [],
     comments: [],
 
-    riskScore: typeof risk.score === 'number' ? risk.score : undefined,
+    riskScore: typeof risk?.score === 'number' ? risk.score : undefined,
     wasteCoverage:
       typeof features.waste_coverage_percent === 'number'
         ? features.waste_coverage_percent

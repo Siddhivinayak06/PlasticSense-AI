@@ -1,14 +1,17 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchDetection, resolveImageUrl } from '@/services/detection';
-import { Loader2, ArrowLeft, Download, Scan, Info, Calendar, MapPin, ShieldAlert, Sparkles, PlusCircle } from 'lucide-react';
+import { fetchDetection, resolveImageUrl, riskFromDetection } from '@/services/detection';
+import { CreateAssignmentDialog } from '@/features/assignments/CreateAssignmentDialog';
+import { QueryError } from '@/components/shared/QueryError';
+import { isAxiosError } from 'axios';
+import { Loader2, ArrowLeft, ExternalLink, Scan, Info, Calendar, MapPin, ShieldAlert, Sparkles, PlusCircle } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ImageComparison } from '@/components/shared/ImageComparison';
 import { DetectionCard } from '@/components/shared/DetectionCard';
 import { CleanupRecommendation } from '@/features/dashboard/CleanupRecommendation';
-import { SeverityBadge } from '@/components/shared/SeverityBadge';
+import { SeverityBadge, type SeverityLevel } from '@/components/shared/SeverityBadge';
 import { format } from 'date-fns';
 import Link from 'next/link';
 
@@ -17,10 +20,11 @@ export default function HistoryDetailPage() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['detection', id],
     queryFn: () => fetchDetection(id),
     enabled: !!id,
+    retry: false,
   });
 
   if (isLoading) {
@@ -32,6 +36,10 @@ export default function HistoryDetailPage() {
   }
 
   const detection = data?.data;
+
+  if (isError && !(isAxiosError(error) && error.response?.status === 404)) {
+    return <QueryError onRetry={() => refetch()} />;
+  }
 
   if (!detection) {
     return (
@@ -45,9 +53,12 @@ export default function HistoryDetailPage() {
   }
 
   const coveragePercent = detection.segmentation?.waste_coverage_percent ?? detection.summary?.waste_coverage_percent ?? 0;
-  const rawSev = (detection.risk?.level || detection.risk?.severity || detection.summary?.severity || 'low').toLowerCase();
-  const severity = rawSev === 'moderate' ? 'medium' : rawSev;
-  const riskScore = detection.risk?.score != null ? Math.round(detection.risk.score) : 0;
+  const rawSev = String(detection.risk?.level ?? '').toLowerCase();
+  const normSev = rawSev === 'moderate' ? 'medium' : rawSev;
+  const severity: SeverityLevel | null =
+    normSev === 'low' || normSev === 'medium' || normSev === 'high' || normSev === 'critical' ? normSev : null;
+  const riskScore = detection.risk?.score != null ? Math.round(detection.risk.score) : null;
+  const riskAssessment = riskFromDetection(detection);
   const breakdown = detection.risk?.strategy_breakdown || {};
   const hazardIndicators = breakdown.hazard_indicators || {};
   const materialCoverage = detection.segmentation?.material_coverage || breakdown.material_coverage || {};
@@ -63,24 +74,51 @@ export default function HistoryDetailPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">Detection Details</h1>
-              <SeverityBadge severity={severity as any} />
+              {severity
+                ? <SeverityBadge severity={severity} />
+                : <span className="text-xs font-semibold text-muted-foreground border rounded-full px-2 py-0.5">
+                    {detection.detection_status === 'completed' ? 'Not assessed' : detection.detection_status === 'failed' ? 'Analysis failed' : 'Incomplete'}
+                  </span>}
             </div>
             <p className="text-muted-foreground text-sm font-mono mt-1">ID: {detection.id}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Link href={`/assignments?create_detection_id=${detection.id}`}>
-            <Button className="gap-2">
-              <PlusCircle className="size-4" />
-              Assign Cleanup
-            </Button>
-          </Link>
-          {detection.annotated_image_url && (
-            <a href={resolveImageUrl(detection.annotated_image_url)} download target="_blank" rel="noreferrer">
+          {detection.detection_status === 'completed' && (
+            <CreateAssignmentDialog
+              target={{
+                kind: 'report',
+                detectionId: detection.id,
+                name: detection.latitude !== null && detection.longitude !== null
+                  ? `Report near ${detection.latitude.toFixed(4)}, ${detection.longitude.toFixed(4)}`
+                  : `Report ${detection.id.slice(0, 8)}`,
+                lat: detection.latitude,
+                lng: detection.longitude,
+                riskScore: detection.risk?.score ?? null,
+                wasteCount: detection.items.length,
+              }}
+              trigger={
+                <Button className="gap-2">
+                  <PlusCircle className="size-4" aria-hidden="true" />
+                  Assign Cleanup
+                </Button>
+              }
+            />
+          )}
+          {detection.latitude !== null && (
+            <Link href={`/map/locations/${detection.id}`}>
               <Button variant="outline" className="gap-2">
-                <Download className="size-4" />
-                Download Mask
+                <MapPin className="size-4" aria-hidden="true" />
+                Location
+              </Button>
+            </Link>
+          )}
+          {detection.annotated_image_url && (
+            <a href={resolveImageUrl(detection.annotated_image_url)} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" className="gap-2">
+                <ExternalLink className="size-4" aria-hidden="true" />
+                Annotated Image
               </Button>
             </a>
           )}
@@ -90,8 +128,11 @@ export default function HistoryDetailPage() {
       {/* Meta Info */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="glass rounded-xl p-4 flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="size-3" /> Detection Time</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="size-3" aria-hidden="true" /> Uploaded</span>
           <span className="text-sm font-medium">{format(new Date(detection.created_at), 'MMM d, yyyy HH:mm')}</span>
+          <span className="text-[10px] text-muted-foreground">
+            {detection.captured_at ? `Photo taken ${format(new Date(detection.captured_at), 'MMM d, yyyy HH:mm')}` : 'Capture time unknown (no EXIF)'}
+          </span>
         </div>
         <div className="glass rounded-xl p-4 flex flex-col gap-1">
           <span className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="size-3" /> Location</span>
@@ -109,9 +150,9 @@ export default function HistoryDetailPage() {
               <span className="inline-flex items-center gap-1 text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
                 OCR Overlay GPS
               </span>
-            ) : detection.location_source === 'user_provided' ? (
+            ) : (detection.location_source === 'manual' || detection.location_source === 'user_provided') ? (
               <span className="inline-flex items-center gap-1 text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-semibold">
-                User Provided
+                Entered Manually
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-muted-foreground bg-muted/50 border px-2 py-0.5 rounded-full font-semibold">
@@ -123,9 +164,15 @@ export default function HistoryDetailPage() {
         <div className="glass rounded-xl p-4 flex flex-col gap-1">
           <span className="text-xs text-muted-foreground flex items-center gap-1"><ShieldAlert className="size-3" /> Risk Assessment</span>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-lg font-bold text-foreground">{riskScore}</span>
-            <span className="text-xs text-muted-foreground">/100</span>
-            <span className="text-xs font-semibold capitalize ml-1">({severity})</span>
+            {riskScore === null ? (
+              <span className="text-sm font-medium text-muted-foreground">Not assessed</span>
+            ) : (
+              <>
+                <span className="text-lg font-bold text-foreground">{riskScore}</span>
+                <span className="text-xs text-muted-foreground">/100</span>
+                <span className="text-xs font-semibold capitalize ml-1">({severity})</span>
+              </>
+            )}
           </div>
         </div>
         <div className="glass rounded-xl p-4 flex flex-col gap-1">
@@ -147,9 +194,9 @@ export default function HistoryDetailPage() {
       </div>
 
       {/* Cleanup Recommendation */}
-      {detection.risk && (
+      {riskAssessment && (
         <CleanupRecommendation
-          risk={detection.risk as any}
+          risk={riskAssessment}
           wasteCount={detection.items.length}
         />
       )}

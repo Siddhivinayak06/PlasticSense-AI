@@ -195,10 +195,10 @@ function DataReadout() {
           ● DETECTED
         </Text>
         <Text position={[-0.75, 0.1, 0.01]} fontSize={0.11} color="#f8fafc" anchorX="left">
-          Class: PET Bottle
+          Class: plastic_bottle
         </Text>
         <Text position={[-0.75, -0.1, 0.01]} fontSize={0.11} color="#f8fafc" anchorX="left">
-          Confidence: 98.7%
+          (illustration)
         </Text>
         <Text position={[-0.75, -0.3, 0.01]} fontSize={0.11} color="#f8fafc" anchorX="left">
           Material: Plastic

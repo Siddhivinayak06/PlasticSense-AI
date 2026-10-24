@@ -12,20 +12,22 @@ import {
   AlertTriangle,
   Scan,
   ShieldAlert,
-  Zap,
   Layers,
-  Droplets,
   Info,
   BarChart3,
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { submitDetection, fetchRiskAssessment, resolveImageUrl, fetchSystemHealth, fetchSystemConfig } from '@/services/detection';
+import { submitDetection, fetchRiskAssessment, resolveImageUrl, fetchSystemHealth, fetchSystemConfig, riskFromDetection, type SystemConfig } from '@/services/detection';
+import { apiErrorMessage } from '@/lib/api';
 import type { Detection, DetectionItem, RiskAssessment } from '@/types/detection';
 import exifr from 'exifr';
 import { cn } from '@/lib/utils';
 import { ImageComparison } from '@/components/shared/ImageComparison';
-import { DetectionCard } from '@/components/shared/DetectionCard';
+
+
+const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'];
+const MAX_UPLOAD_MB = 10;
 import { CleanupRecommendation } from '@/features/dashboard/CleanupRecommendation';
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -82,12 +84,12 @@ function UploadZone({
         <p className="text-sm text-muted-foreground">
           or <span className="text-primary font-medium underline underline-offset-2">browse files</span>
         </p>
-        <p className="text-xs text-muted-foreground/60 mt-2">Supports JPG, PNG, WEBP · Max 10 MB</p>
+        <p className="text-xs text-muted-foreground/60 mt-2">Supports JPG, PNG, WEBP, BMP · Max {MAX_UPLOAD_MB} MB</p>
       </div>
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept={ACCEPTED_TYPES.join(',')}
         className="hidden"
         onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
       />
@@ -140,7 +142,7 @@ function DetectionResults({
   risk: RiskAssessment | null;
   imageUrl: string;
   file?: File;
-  systemConfig?: any;
+  systemConfig?: SystemConfig | null;
 }) {
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
@@ -277,7 +279,6 @@ function DetectionResults({
               )}
             </div>
           </div>
-
 
           <div className="pt-2">
             <div className="flex items-center justify-between mb-3">
@@ -434,7 +435,7 @@ export default function DetectPage() {
   const [risk, setRisk] = useState<RiskAssessment | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [systemOnline, setSystemOnline] = useState(true);
-  const [systemConfig, setSystemConfig] = useState<any>(null);
+  const [systemConfig, setSystemConfig] = useState<SystemConfig | null>(null);
 
   useEffect(() => {
     fetchSystemHealth().then((data) => {
@@ -445,12 +446,22 @@ export default function DetectPage() {
 
     fetchSystemConfig().then((data) => {
       setSystemConfig(data);
-    }).catch(console.error);
+    }).catch(() => setSystemConfig(null)); // colours fall back to the theme default
   }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (f: File) => {
+    if (!ACCEPTED_TYPES.includes(f.type)) {
+      setErrorMsg(`"${f.name}" is not a supported image. Use JPG, PNG, WEBP or BMP.`);
+      setState('error');
+      return;
+    }
+    if (f.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      setErrorMsg(`"${f.name}" is ${(f.size / 1024 / 1024).toFixed(1)} MB; the limit is ${MAX_UPLOAD_MB} MB.`);
+      setState('error');
+      return;
+    }
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setState('idle');
@@ -516,6 +527,10 @@ export default function DetectPage() {
     const lat = latitude ? parseFloat(latitude) : null;
     const lng = longitude ? parseFloat(longitude) : null;
 
+    if ((lat === null) !== (lng === null)) {
+      setErrorMsg('Enter both latitude and longitude, or leave both empty.');
+      return;
+    }
     if ((lat !== null && isNaN(lat)) || (lng !== null && isNaN(lng))) {
       setErrorMsg('Please enter valid GPS coordinates or leave them empty.');
       return;
@@ -539,7 +554,7 @@ export default function DetectPage() {
       setDetection(det);
 
       if (det.risk) {
-        setRisk(det.risk as any);
+        setRisk(riskFromDetection(det));
       } else if (det.detection_status === 'completed') {
         try {
           const riskEnvelope = await fetchRiskAssessment(det.id);
@@ -550,16 +565,8 @@ export default function DetectPage() {
       }
       setState('done');
 
-    } catch (err: any) {
-      let msg = 'Detection failed. Make sure the backend is running on port 8000.';
-      if (err?.response?.data?.detail) {
-        msg = typeof err.response.data.detail === 'string'
-          ? err.response.data.detail
-          : JSON.stringify(err.response.data.detail);
-      } else if (err?.message) {
-        msg = err.message;
-      }
-      setErrorMsg(msg);
+    } catch (err) {
+      setErrorMsg(apiErrorMessage(err, 'Detection failed. Please try again.'));
       setState('error');
     }
 

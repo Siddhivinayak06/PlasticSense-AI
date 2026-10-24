@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight, Zap } from 'lucide-react';
-import { quickActions } from '@/mock';
+import { quickActions } from '@/constants/quickActions';
 import { cn } from '@/lib/utils';
 import { cardEntrance, containerVariants, microInteractions } from '@/lib/motion';
 

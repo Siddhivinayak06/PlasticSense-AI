@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AreaChart,
   Area,
@@ -21,7 +21,22 @@ interface TimeSeriesChartProps {
 }
 
 export function TimeSeriesChart({ data }: TimeSeriesChartProps) {
-  const [period, setPeriod] = useState<'daily' | 'monthly'>('monthly');
+  const [period, setPeriod] = useState<'daily' | 'monthly'>('daily');
+  const canAggregate = data.every((d) => d.isoDate);
+  const chartData = useMemo(() => {
+    if (period === 'daily' || !canAggregate) return data;
+    const months = new Map<string, TimeSeriesData>();
+    for (const d of data) {
+      const key = d.isoDate!.slice(0, 7);
+      const label = new Date(`${key}-01T00:00:00`).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+      const m = months.get(key) ?? { date: label, isoDate: key, total: 0, resolved: 0, critical: 0 };
+      m.total += d.total;
+      m.resolved += d.resolved;
+      m.critical += d.critical;
+      months.set(key, m);
+    }
+    return [...months.values()];
+  }, [data, period, canAggregate]);
 
   return (
     <motion.div
@@ -39,17 +54,20 @@ export function TimeSeriesChart({ data }: TimeSeriesChartProps) {
             <h3 className="text-sm sm:text-base font-semibold text-foreground tracking-tight">
               Report Volume Trends
             </h3>
-            <p className="text-xs text-muted-foreground hidden sm:block">Historical detection & resolution timeline</p>
+            <p className="text-xs text-muted-foreground hidden sm:block">Reports received, cleanups completed and high-risk assessments per {period === 'daily' ? 'day' : 'month'}</p>
           </div>
         </div>
 
         {/* Animated Segmented Period Control */}
-        <div className="flex items-center bg-muted/60 dark:bg-slate-800/60 rounded-xl p-1 border border-border/40">
+        {canAggregate && (
+        <div role="group" aria-label="Aggregation period" className="flex items-center bg-muted/60 dark:bg-slate-800/60 rounded-xl p-1 border border-border/40">
           {(['daily', 'monthly'] as const).map((p) => {
             const isActive = period === p;
             return (
               <button
                 key={p}
+                type="button"
+                aria-pressed={isActive}
                 onClick={() => setPeriod(p)}
                 className="relative px-3 py-1.5 text-xs font-semibold rounded-lg capitalize transition-colors z-10 text-muted-foreground hover:text-foreground"
               >
@@ -67,11 +85,12 @@ export function TimeSeriesChart({ data }: TimeSeriesChartProps) {
             );
           })}
         </div>
+        )}
       </div>
 
       <div className="h-[320px] sm:h-[350px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -133,7 +152,7 @@ export function TimeSeriesChart({ data }: TimeSeriesChartProps) {
             <Area
               type="monotone"
               dataKey="resolved"
-              name="Resolved"
+              name="Cleanups Completed"
               stroke="#10b981"
               strokeWidth={2}
               fillOpacity={1}
@@ -144,7 +163,7 @@ export function TimeSeriesChart({ data }: TimeSeriesChartProps) {
             <Area
               type="monotone"
               dataKey="critical"
-              name="Critical"
+              name="High/Critical Risk"
               stroke="#ef4444"
               strokeWidth={2}
               fillOpacity={1}

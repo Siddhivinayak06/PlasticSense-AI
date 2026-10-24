@@ -3,8 +3,10 @@ export interface KPI {
   title: string;
   value: string | number;
   trend: 'up' | 'down' | 'neutral';
-  percentageChange: number;
+  /** Week-over-week change; null when there is not enough history to compare. */
+  percentageChange: number | null;
   sparklineData: { date: string; value: number }[];
+  hint?: string;
 }
 
 export interface Insight {
@@ -16,6 +18,8 @@ export interface Insight {
 
 export interface TimeSeriesData {
   date: string;
+  /** YYYY-MM-DD; enables monthly aggregation */
+  isoDate?: string;
   total: number;
   resolved: number;
   critical: number;
@@ -35,23 +39,23 @@ export interface SeverityData {
   critical: number;
 }
 
+/** One observed cluster (same clustering as the Hotspots page). */
 export interface LocationData {
-  city: string;
+  hotspotId: string;
+  name: string;
   reports: number;
-  hotspots: number;
-  avgSeverity: number;
-  cleanups: number;
+  wasteObjects: number;
+  /** Null when no member report has a risk assessment. */
+  avgRisk: number | null;
+  maxRisk: number | null;
+  severity: string;
+  cleanupsCompleted: number;
 }
 
 export interface CleanupPerformanceData {
   month: string;
+  created: number;
   completed: number;
-  pending: number;
-  efficiency: number; // percentage
-}
-
-export interface AIAnalyticsData {
-  category: string;
-  accuracy: number;
-  confidence: number;
+  /** completed / created for the month, as a percentage; null when nothing was created. */
+  completionRate: number | null;
 }

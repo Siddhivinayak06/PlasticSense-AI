@@ -6,103 +6,96 @@ import { InsightCards } from '@/features/analytics/InsightCards';
 import { TimeSeriesChart } from '@/features/analytics/TimeSeriesChart';
 import { WasteDistributionChart } from '@/features/analytics/WasteDistributionChart';
 import { fetchStatistics, fetchAnalytics } from '@/services/analytics';
+import { fetchHotspots } from '@/services/hotspots';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { QueryError } from '@/components/shared/QueryError';
 import { Loader2, ShieldAlert, BarChart3 } from 'lucide-react';
 import type { KPI, Insight, TimeSeriesData } from '@/types/analytics';
 import { useMemo } from 'react';
 
-export default function AnalyticsOverviewPage() {
-  const { data: stats, isLoading: isStatsLoading } = useQuery({
-    queryKey: ['statistics'],
-    queryFn: fetchStatistics,
-  });
+/** Last 7 days vs the 7 before, from real daily counts. Null without enough history. */
+function weekOverWeek(series: { total: number }[]): { change: number | null; trend: KPI['trend'] } {
+  if (series.length < 14) return { change: null, trend: 'neutral' };
+  const last = series.slice(-7).reduce((a, d) => a + d.total, 0);
+  const prev = series.slice(-14, -7).reduce((a, d) => a + d.total, 0);
+  if (prev === 0) return { change: null, trend: 'neutral' };
+  const change = Math.round(((last - prev) / prev) * 1000) / 10;
+  return { change, trend: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral' };
+}
 
-  const { data: analytics, isLoading: isAnalyticsLoading } = useQuery({
-    queryKey: ['analytics'],
-    queryFn: fetchAnalytics,
-  });
+export default function AnalyticsOverviewPage() {
+  const statsQuery = useQuery({ queryKey: ['statistics'], queryFn: fetchStatistics });
+  const analyticsQuery = useQuery({ queryKey: ['analytics'], queryFn: fetchAnalytics });
+  const hotspotsQuery = useQuery({ queryKey: ['hotspots'], queryFn: fetchHotspots });
+  const stats = statsQuery.data;
+  const analytics = analyticsQuery.data;
+  const isStatsLoading = statsQuery.isLoading;
+  const isAnalyticsLoading = analyticsQuery.isLoading;
 
   const totalDetections = stats?.total_detections ?? 0;
   const totalObjects = stats ? Object.values(stats.waste_breakdown).reduce((a, b) => a + b, 0) : 0;
   const plasticCount = stats?.waste_breakdown?.plastic ?? 0;
+  const series = useMemo(() => analytics?.time_series ?? [], [analytics]);
+  const { change, trend } = weekOverWeek(series);
 
   const kpis: KPI[] = [
     {
       id: 'total',
-      title: 'Total Detections',
+      title: 'Total Reports',
       value: totalDetections.toLocaleString(),
-      percentageChange: 12.5,
-      trend: 'up',
-      sparklineData: [
-        { date: '1', value: Math.max(0, totalDetections - 8) },
-        { date: '2', value: totalDetections },
-      ],
+      percentageChange: change,
+      trend,
+      sparklineData: series.slice(-14).map((d) => ({ date: d.date, value: d.total })),
+      hint: 'Images analysed and stored',
     },
     {
       id: 'objects',
-      title: 'Total Waste Objects',
+      title: 'Waste Objects Detected',
       value: totalObjects.toLocaleString(),
-      percentageChange: 18.2,
-      trend: 'up',
-      sparklineData: [
-        { date: '1', value: Math.max(0, totalObjects - 15) },
-        { date: '2', value: totalObjects },
-      ],
+      percentageChange: null,
+      trend: 'neutral',
+      sparklineData: [],
+      hint: totalDetections ? `${(totalObjects / totalDetections).toFixed(1)} per report on average` : undefined,
     },
     {
       id: 'plastic',
       title: 'Plastic Items',
       value: plasticCount.toLocaleString(),
-      percentageChange: 5.4,
+      percentageChange: null,
       trend: 'neutral',
-      sparklineData: [
-        { date: '1', value: Math.max(0, plasticCount - 2) },
-        { date: '2', value: plasticCount },
-      ],
+      sparklineData: [],
+      hint: totalObjects ? `${((plasticCount / totalObjects) * 100).toFixed(1)}% of all objects` : undefined,
     },
     {
-      id: 'risk',
-      title: 'Monitored Hotspots',
-      value: (analytics?.waste_composition?.length ?? 5).toString(),
-      percentageChange: 0,
+      id: 'hotspots',
+      title: 'Observed Hotspots',
+      value: hotspotsQuery.data ? hotspotsQuery.data.total_hotspots.toString() : '—',
+      percentageChange: null,
       trend: 'neutral',
-      sparklineData: [{ date: '1', value: 4 }, { date: '2', value: 5 }],
-    }
+      sparklineData: [],
+      hint: 'Clusters of geolocated reports',
+    },
   ];
 
-  const timeSeriesData: TimeSeriesData[] = useMemo(() => {
-    if (!analytics?.time_series || analytics.time_series.length === 0) {
-      return [
-        { date: 'Day 1', total: 4, resolved: 3, critical: 1 },
-        { date: 'Day 2', total: 8, resolved: 6, critical: 2 },
-        { date: 'Day 3', total: 14, resolved: 10, critical: 3 },
-      ];
-    }
-    return analytics.time_series.map((ts) => ({
-      date: ts.date,
-      total: ts.total,
-      resolved: ts.resolved,
-      critical: ts.critical,
-    }));
-  }, [analytics?.time_series]);
+  const timeSeriesData: TimeSeriesData[] = useMemo(
+    () => series.map((ts) => ({ date: ts.date, isoDate: ts.iso_date, total: ts.total, resolved: ts.resolved, critical: ts.critical })),
+    [series],
+  );
 
-  const insights: Insight[] = useMemo(() => {
-    if (!analytics?.insights || analytics.insights.length === 0) {
-      return [
-        {
-          id: 'ins-1',
-          type: 'positive',
-          message: 'Dual-model AI waste detection pipeline active and operational across all monitored sectors.',
-          timestamp: 'Just now',
-        },
-      ];
-    }
-    return analytics.insights.map((ins) => ({
-      id: ins.id,
-      type: ins.type === 'warning' ? 'alert' : ins.type === 'success' ? 'positive' : 'neutral',
-      message: `${ins.title} — ${ins.description}`,
-      timestamp: 'Today',
-    }));
-  }, [analytics?.insights]);
+  const insights: Insight[] = useMemo(
+    () =>
+      (analytics?.insights ?? []).map((ins) => ({
+        id: ins.id,
+        type: ins.type === 'warning' ? 'alert' : ins.type === 'success' ? 'positive' : 'neutral',
+        message: `${ins.title} — ${ins.description}`,
+        timestamp: 'Live',
+      })),
+    [analytics?.insights],
+  );
+
+  if (statsQuery.isError || analyticsQuery.isError) {
+    return <QueryError onRetry={() => { statsQuery.refetch(); analyticsQuery.refetch(); }} />;
+  }
 
   if (isStatsLoading && isAnalyticsLoading) {
     return (
@@ -116,8 +109,15 @@ export default function AnalyticsOverviewPage() {
     <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
       <KPIGrid kpis={kpis} />
 
-      {/* Real AI-generated insights from database state */}
-      <InsightCards insights={insights} />
+      {totalDetections === 0 && (
+        <EmptyState
+          title="No reports analysed yet"
+          description="Upload an image on the Detect page; analytics are computed from stored results."
+        />
+      )}
+
+      {/* Insights computed from database state */}
+      {insights.length > 0 && <InsightCards insights={insights} />}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2">

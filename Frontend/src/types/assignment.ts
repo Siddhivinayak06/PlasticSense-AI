@@ -1,52 +1,40 @@
-import { Priority } from './hotspot';
+export type AssignmentStatus = 'pending' | 'assigned' | 'in-progress' | 'completed' | 'verified' | 'rejected';
+export type AssignmentPriority = 'urgent' | 'high' | 'medium' | 'low';
 
-export type AssignmentStatus = 'pending' | 'assigned' | 'in-progress' | 'completed' | 'verified' | 'closed';
-
-export interface Volunteer {
+/** UI view of a cleanup assignment. Every field comes from the API; nothing is filled in. */
+export interface CleanupAssignment {
   id: string;
-  name: string;
-  role: 'leader' | 'member';
-  avatar?: string;
-}
-
-export interface Team {
-  id: string;
-  name: string;
-  ngo: string;
-  volunteers: Volunteer[];
-}
-
-export interface TaskItem {
-  id: string;
-  label: string;
-  completed: boolean;
+  title: string;
+  locationName: string;
+  detectionId: string | null;
+  hotspotId: string | null;
+  lat: number | null;
+  lng: number | null;
+  ngoTeamId: string | null;
+  ngoTeamName: string | null;
+  status: AssignmentStatus;
+  priority: AssignmentPriority;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  riskScore: number;
+  wasteBefore: number;
+  wasteAfter: number | null;
+  wasteReductionPercent: number | null;
+  createdAt: string;
+  updatedAt: string;
+  scheduledDate: string | null;
+  completedDate: string | null;
+  beforeImageUrl: string | null;
+  afterImageUrl: string | null;
+  notes: string | null;
+  isSample: boolean;
+  /** Position in the workflow (0-100), derived from status. Not a measured completion. */
+  workflowStage: number;
 }
 
 export interface TimelineEvent {
   id: string;
-  stage: 'reported' | 'verified' | 'assigned' | 'accepted' | 'started' | 'completed' | 'inspection' | 'closed';
   label: string;
-  date: string;
-  description?: string;
+  date: string | null;
   completed: boolean;
-}
-
-export interface CleanupAssignment {
-  id: string;
-  hotspotId: string;
-  hotspotName: string;
-  assignedNgo: string;
-  team: Team;
-  assignedDate: string;
-  scheduledDate: string;
-  completionDate?: string;
-  status: AssignmentStatus;
-  priority: Priority;
-  progress: number; // 0 to 100
-  equipmentChecklist: TaskItem[];
-  timeline: TimelineEvent[];
-  estimatedDurationHours: number;
-  imagesBefore?: string[];
-  imagesAfter?: string[];
-  supervisorNotes?: string;
+  description?: string;
 }

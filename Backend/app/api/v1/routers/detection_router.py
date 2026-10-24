@@ -1,7 +1,9 @@
 import math
 from typing import Optional
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from app.api.dependencies import get_detection_service
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from sqlalchemy.orm import Session
+from app.api.dependencies import get_db, get_detection_service
+from app.api.upload_guard import charge_rate_limit, inference_rate_limit, read_upload_limited
 from app.api.v1.schemas.detection_schema import (
     DetectionItemSchema,
     DetectionSchema,
@@ -12,7 +14,8 @@ from app.api.v1.schemas.detection_schema import (
     MapDetectionEnvelope
 )
 from app.application.dto.detection_dto import DetectionCreateDTO
-from app.application.services.detection_service import DetectionService
+from app.application.services.detection_service import DetectionService, ModelUnavailableError
+from app.core.config import settings
 from app.core.cache import cache_clear, cache_get, cache_set
 from app.core.logging import logger
 
@@ -127,33 +130,54 @@ def _to_detection_schema(dto) -> DetectionSchema:
     summary="Upload image & run comprehensive waste analysis (alias for /detect)",
 )
 async def create_detection(
-    latitude: Optional[float] = Form(None, description="Latitude coordinate (-90 to 90)"),
-    longitude: Optional[float] = Form(None, description="Longitude coordinate (-180 to 180)"),
-    image: Optional[UploadFile] = File(None, description="Plastic waste image file (JPG, PNG, WEBP)"),
-    file: Optional[UploadFile] = File(None, description="Plastic waste image file (alias)"),
+    latitude: Optional[float] = Form(None, ge=-90, le=90, description="Latitude coordinate (-90 to 90)"),
+    longitude: Optional[float] = Form(None, ge=-180, le=180, description="Longitude coordinate (-180 to 180)"),
+    image: Optional[UploadFile] = File(None, description="Waste image file (JPG, PNG, WEBP, BMP)"),
+    file: Optional[UploadFile] = File(None, description="Waste image file (alias)"),
     service: DetectionService = Depends(get_detection_service),
+    _limited: None = Depends(inference_rate_limit),
 ):
     upload_file = image or file
     if not upload_file:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Image file is required")
-    try:
-        file_bytes = await upload_file.read()
-        dto = DetectionCreateDTO(
-            latitude=latitude,
-            longitude=longitude,
-            filename=upload_file.filename or "uploaded_image.jpg",
-            content_type=upload_file.content_type or "image/jpeg",
-            file_bytes=file_bytes,
+    if (latitude is None) != (longitude is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Provide both latitude and longitude, or neither",
         )
-        result = service.create_detection(dto)
-        cache_clear()
-        return _to_detection_schema(result)
+    result = await run_detection(service, upload_file, latitude, longitude)
+    cache_clear()
+    return _to_detection_schema(result)
+
+
+async def run_detection(service: DetectionService, upload_file: UploadFile, latitude, longitude):
+    """Validate, analyse and persist one upload, mapping failures to safe HTTP errors.
+
+    Client errors (bad file, bad coordinates) return their validation message.
+    Anything unexpected is logged in full server-side but returns a generic 500, so
+    stack details, file paths and database errors never reach the browser.
+    """
+    file_bytes = await read_upload_limited(upload_file)
+    dto = DetectionCreateDTO(
+        latitude=latitude,
+        longitude=longitude,
+        filename=upload_file.filename or "uploaded_image.jpg",
+        content_type=upload_file.content_type or "",
+        file_bytes=file_bytes,
+    )
+    try:
+        return service.create_detection(dto)
+    except ModelUnavailableError as err:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(err))
     except ValueError as err:
-        logger.error(f"Detection creation failed: {err}")
+        logger.warning(f"Rejected upload '{upload_file.filename}': {err}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
     except Exception as err:
         logger.error(f"Unexpected error in create_detection: {err}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(err))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="The server could not process this image. Please try again.",
+        )
 
 
 @router.post(
@@ -163,26 +187,29 @@ async def create_detection(
     summary="Upload multiple images",
 )
 async def create_batch_detection(
-    latitude: Optional[float] = Form(None, description="Latitude coordinate"),
-    longitude: Optional[float] = Form(None, description="Longitude coordinate"),
+    request: Request,
+    latitude: Optional[float] = Form(None, ge=-90, le=90, description="Latitude coordinate"),
+    longitude: Optional[float] = Form(None, ge=-180, le=180, description="Longitude coordinate"),
     files: list[UploadFile] = File(..., description="List of images"),
     service: DetectionService = Depends(get_detection_service),
+    _limited: None = Depends(inference_rate_limit),
 ):
+    if len(files) > settings.MAX_BATCH_FILES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"At most {settings.MAX_BATCH_FILES} images per batch",
+        )
+    charge_rate_limit(request, len(files) - 1)
     results = []
     for upload_file in files:
         try:
-            file_bytes = await upload_file.read()
-            dto = DetectionCreateDTO(
-                latitude=latitude,
-                longitude=longitude,
-                filename=upload_file.filename or "uploaded_image.jpg",
-                content_type=upload_file.content_type or "image/jpeg",
-                file_bytes=file_bytes,
-            )
-            result = service.create_detection(dto)
-            results.append(_to_detection_schema(result))
-        except Exception as e:
-            logger.error(f"Failed to process {upload_file.filename} in batch: {e}")
+            results.append(_to_detection_schema(
+                await run_detection(service, upload_file, latitude, longitude)
+            ))
+        except HTTPException as e:
+            if e.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
+                raise
+            logger.error(f"Failed to process {upload_file.filename} in batch: {e.detail}")
             continue
 
     cache_clear()
@@ -231,7 +258,10 @@ class HotspotItemSchema(BaseModel):
     priority: str
     dominant_materials: list[str]
     most_common_material: str
+    # Derived from linked cleanup assignments: pending | in_progress | resolved | verified
     status: str
+    assigned_team: Optional[str] = None
+    assignment_ids: list[str] = []
     last_updated: str
     detection_ids: list[str]
 
@@ -274,6 +304,7 @@ def get_map_detections(
 )
 def get_hotspots(
     service: DetectionService = Depends(get_detection_service),
+    db: Session = Depends(get_db),
 ):
     """Spatially group reports that have already been observed.
 
@@ -284,20 +315,63 @@ def get_hotspots(
     cached = cache_get("clustered_hotspots")
     if cached:
         return cached
+    res = compute_hotspots(service, db)
+    cache_set("clustered_hotspots", res, ttl_seconds=30)
+    return res
+
+
+@router.get(
+    "/hotspots/{hotspot_id}",
+    response_model=HotspotItemSchema,
+    summary="Get one observed cluster by id",
+)
+def get_hotspot(
+    hotspot_id: str,
+    service: DetectionService = Depends(get_detection_service),
+    db: Session = Depends(get_db),
+):
+    for h in get_hotspots(service, db).hotspots:
+        if h.id == hotspot_id:
+            return h
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Hotspot not found. Cluster ids are derived from member reports and change when new reports join a cluster.",
+    )
+
+
+_ACTIVE_ASSIGNMENT = {"pending", "assigned", "in_progress"}
+
+
+def _cluster_status(assignments: list) -> tuple:
+    """Hotspot status from its real cleanup assignments; 'pending' when none exist."""
+    if not assignments:
+        return "pending", None
+    active = [a for a in assignments if a.status in _ACTIVE_ASSIGNMENT]
+    if active:
+        latest = max(active, key=lambda a: a.created_at)
+        return "in_progress", latest.ngo_team_name
+    statuses = {a.status for a in assignments}
+    team = max(assignments, key=lambda a: a.created_at).ngo_team_name
+    if "verified" in statuses:
+        return "verified", team
+    if "completed" in statuses:
+        return "resolved", team
+    return "pending", None  # only rejected verifications: the site still needs work
+
+
+def compute_hotspots(service: DetectionService, db: Session) -> "HotspotsEnvelope":
+    from app.infrastructure.database.models.assignment_model import CleanupAssignmentModel
 
     items = service.list_map_detections()
     if not items:
-        res = HotspotsEnvelope(hotspots=[], total_hotspots=0)
-        cache_set("clustered_hotspots", res, ttl_seconds=30)
-        return res
+        return HotspotsEnvelope(hotspots=[], total_hotspots=0)
 
     located = [d for d in items if d.latitude is not None and d.longitude is not None]
     if not located:
-        res = HotspotsEnvelope(hotspots=[], total_hotspots=0)
-        cache_set("clustered_hotspots", res, ttl_seconds=30)
-        return res
+        return HotspotsEnvelope(hotspots=[], total_hotspots=0)
 
     clusters = _cluster_by_distance(located, CLUSTER_RADIUS_M)
+    assignments = db.query(CleanupAssignmentModel).all()
 
     hotspot_list = []
     for idx, cl in enumerate(clusters):
@@ -364,8 +438,16 @@ def get_hotspots(
             ),
         )
 
+        cluster_id = f"CLUSTER-{c_lat:.4f}_{c_lng:.4f}"
+        member_ids = {d.id for d in cl}
+        linked = [
+            a for a in assignments
+            if a.detection_id in member_ids or a.hotspot_id == cluster_id
+        ]
+        cluster_status, assigned_team = _cluster_status(linked)
+
         hotspot_list.append(HotspotItemSchema(
-            id=f"CLUSTER-{c_lat:.4f}_{c_lng:.4f}",
+            id=cluster_id,
             name=f"Observed cluster near {c_lat:.4f}, {c_lng:.4f}",
             latitude=round(c_lat, 6),
             longitude=round(c_lng, 6),
@@ -378,7 +460,9 @@ def get_hotspots(
             priority=priority,
             dominant_materials=dominant_mats,
             most_common_material=most_common,
-            status="pending",
+            status=cluster_status,
+            assigned_team=assigned_team,
+            assignment_ids=[a.id for a in linked],
             last_updated=latest_dt.isoformat() if hasattr(latest_dt, "isoformat") else str(latest_dt),
             detection_ids=[d.id for d in cl],
         ))
@@ -393,9 +477,7 @@ def get_hotspots(
         ),
         reverse=True,
     )
-    res = HotspotsEnvelope(hotspots=hotspot_list, total_hotspots=len(hotspot_list))
-    cache_set("clustered_hotspots", res, ttl_seconds=30)
-    return res
+    return HotspotsEnvelope(hotspots=hotspot_list, total_hotspots=len(hotspot_list))
 
 
 @router.get(

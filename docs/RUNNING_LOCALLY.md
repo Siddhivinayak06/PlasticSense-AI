@@ -24,18 +24,23 @@ cd Backend
 - Interactive docs: <http://127.0.0.1:8000/docs>
 - Health (includes which database is actually in use): <http://127.0.0.1:8000/api/v1/health>
 
-### Database
+### Database (Supabase)
 
-`Backend/.env` may point `DATABASE_URL` at a remote PostgreSQL instance. If that host is
-unreachable the app **automatically falls back to the local SQLite file**
-`Backend/wastesense.db` and logs the fallback loudly. `/api/v1/health` always reports which
-backend is live:
+`Backend/.env` → `DATABASE_URL` must be the **Session pooler** URI from Supabase Dashboard →
+Connect → *Session pooler* (host `aws-0-<region>.pooler.supabase.com`, port `5432`, user
+`postgres.<project-ref>`). Do **not** use the direct host `db.<ref>.supabase.co`: it is IPv6-only and
+fails on IPv4 networks. URL-encode special characters in the password (`@` → `%40`, `#` → `%23`).
+`SUPABASE_URL` + `SUPABASE_KEY` (server-side *secret* key) enable image storage in the `images` bucket.
 
-```json
-{"database": {"backend": "sqlite-fallback", "using_fallback": true, "fallback_reason": "OperationalError"}}
-```
+If the database is unreachable the app falls back to `Backend/wastesense.db` (SQLite) and
+`/api/v1/health` reports `"status": "degraded"`, `"using_fallback": true`. To use SQLite deliberately
+set `DB_FORCE_SQLITE=true`. `alembic upgrade head` refuses to migrate the *fallback* database, so a
+broken `DATABASE_URL` can never silently migrate SQLite instead of Supabase.
 
-To force local SQLite and skip the connection attempt, set `DB_FORCE_SQLITE=true` in `.env`.
+Supabase hardening (migration `e7c1a9d24f50`): RLS enabled on every public table with no policies and
+all `anon`/`authenticated` grants revoked — the browser never talks to Supabase directly; only the
+backend does. Seeded demo NGO/assignment rows are flagged `is_sample` (migration `f3d2b8c61a07`) and
+labelled "Sample" in the UI. Seeding is off by default (`SEED_SAMPLE_DATA=false`).
 
 ### Active models
 
@@ -61,13 +66,24 @@ Opens on <http://localhost:3000>. API base URL comes from `Frontend/.env.local`
 
 ## 3. Tests
 
-Start the backend first — the end-to-end tests exercise the real HTTP API, real model inference
-and real persistence. They skip automatically if the server is not running.
+```bash
+cd Backend
+.venv/bin/python -m pytest -q --ignore=tests/test_e2e_local.py   # unit + integration + security (36)
+```
+
+The end-to-end suite POSTs real images, so run it against an isolated SQLite instance to keep test
+records out of Supabase:
 
 ```bash
 cd Backend
-.venv/bin/python -m pytest tests/test_e2e_local.py -v
+cp wastesense.db /tmp/e2e.db
+DB_FORCE_SQLITE=true SQLITE_PATH=/tmp/e2e.db SUPABASE_URL= SUPABASE_KEY= .venv/bin/alembic upgrade head
+DB_FORCE_SQLITE=true SQLITE_PATH=/tmp/e2e.db SUPABASE_URL= SUPABASE_KEY= UPLOAD_DIR=/tmp/e2e_up RESULTS_DIR=/tmp/e2e_res \
+  .venv/bin/python -m uvicorn app.main:app --port 8001 &
+WASTESENSE_API=http://127.0.0.1:8001/api/v1 .venv/bin/python -m pytest -q tests/test_e2e_local.py   # 20
 ```
+
+Frontend: `npx tsc --noEmit`, `npm run lint` (0 errors), `npm run build`.
 
 ## 4. Research evidence scripts
 
@@ -92,5 +108,8 @@ cd WasteSense-Model-Lab
   manual coordinate entry — analysis still proceeds.
 - **First inference is slow** (~2 s) because of CUDA context setup; subsequent requests are
   ~0.1–0.3 s.
-- Uploads are written to `Backend/media/uploads`; annotated derivatives to `Backend/media/results`.
-  The original is never overwritten.
+- With Supabase Storage configured, originals and annotated images go to the `images` bucket;
+  otherwise to `UPLOAD_DIR` / `RESULTS_DIR` on disk. The original is never overwritten.
+- Uploads are validated by content (decoded image signature), max 10 MB, max 64 MP, 30 analyses/min
+  per client IP, batch ≤ 10 files. CORS admits only `http://localhost:3000` and `http://127.0.0.1:3000`.
+- No user accounts: this is a single-operator local deployment. Do not expose port 8000 publicly.

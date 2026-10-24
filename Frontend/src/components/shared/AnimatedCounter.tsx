@@ -24,10 +24,7 @@ export function AnimatedCounter({
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (prefersReducedMotion) {
-      setDisplayValue(value);
-      return;
-    }
+    if (prefersReducedMotion) return; // rendered directly below, no animation
 
     startValRef.current = displayValue;
     targetValRef.current = value;
@@ -57,5 +54,5 @@ export function AnimatedCounter({
     };
   }, [value, duration, prefersReducedMotion]);
 
-  return <span className={`tabular-nums ${className}`}>{formatter(displayValue)}</span>;
+  return <span className={`tabular-nums ${className}`}>{formatter(prefersReducedMotion ? value : displayValue)}</span>;
 }

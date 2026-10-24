@@ -1,8 +1,9 @@
 
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.routers import (
@@ -27,11 +28,12 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.RESULTS_DIR, exist_ok=True)
     Base.metadata.create_all(bind=engine)
-    try:
-        with SessionLocal() as db:
-            seed_ngos_and_assignments(db)
-    except Exception as e:
-        logger.error(f"Seeding error in lifespan: {e}")
+    if settings.SEED_SAMPLE_DATA:
+        try:
+            with SessionLocal() as db:
+                seed_ngos_and_assignments(db)
+        except Exception as e:
+            logger.error(f"Seeding error in lifespan: {e}")
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}")
 
@@ -46,16 +48,38 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS middleware
-# Configure CORS middleware (support localhost, 127.0.0.1, and LAN IPs in dev)
+# CORS: only the configured frontend origins (localhost:3000 by default). The API
+# uses no cookies, so credentials are not allowed. Set CORS_ORIGIN_REGEX in .env to
+# admit additional origins deliberately (e.g. a LAN address for a phone demo).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|0\.0\.0\.0|.*\.vercel\.app)(:\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Accept"],
 )
+
+# Largest legitimate request: a full batch of maximum-size images plus form overhead.
+_MAX_BODY_BYTES = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024 * settings.MAX_BATCH_FILES + 1024 * 1024
+
+
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > _MAX_BODY_BYTES:
+        return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    if request.url.path.startswith("/media/"):
+        # User-supplied images: never let a stored file execute as a document.
+        response.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; sandbox"
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+    else:
+        response.headers.setdefault("X-Frame-Options", "DENY")
+    return response
+
 
 # Static files for uploaded images and results
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

@@ -1,94 +1,121 @@
 'use client';
 
-import { useState } from 'react';
-import { CleanupAssignment } from '@/types/assignment';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import type { CleanupAssignment } from '@/types/assignment';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
-import { MapPin, Users, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { CalendarX, Users, ChevronRight } from 'lucide-react';
+import { SampleTag } from './CleanupTable';
 
 interface CleanupCalendarProps {
   assignments: CleanupAssignment[];
 }
 
+function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function AssignmentRow({ assignment }: { assignment: CleanupAssignment }) {
+  return (
+    <Link
+      href={`/assignments/${assignment.id}`}
+      className="flex items-center justify-between gap-3 p-4 rounded-lg border border-border/50 bg-secondary/30 hover:bg-secondary/60 transition-colors"
+    >
+      <div className="space-y-1.5 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-xs font-semibold">{assignment.id}</span>
+          <StatusBadge status={assignment.status} size="sm" />
+          {assignment.isSample && <SampleTag />}
+        </div>
+        <p className="font-semibold truncate">{assignment.title}</p>
+        <p className="text-sm text-muted-foreground flex items-center gap-1">
+          <Users className="w-3 h-3" aria-hidden="true" /> {assignment.ngoTeamName ?? 'No team assigned'}
+        </p>
+      </div>
+      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden="true" />
+    </Link>
+  );
+}
+
 export const CleanupCalendar = ({ assignments }: CleanupCalendarProps) => {
   const [date, setDate] = useState<Date | undefined>(new Date());
 
-  const selectedAssignments = assignments.filter(a => {
-    if (!date) return false;
-    const aDate = new Date(a.scheduledDate);
-    return aDate.getDate() === date.getDate() && 
-           aDate.getMonth() === date.getMonth() && 
-           aDate.getFullYear() === date.getFullYear();
-  });
-
-  // Calculate dates with events for highlighting in a real calendar
-  // (In standard shadcn calendar we just pick one date, but we could customize it to show dots)
+  const scheduled = useMemo(() => assignments.filter((a) => a.scheduledDate), [assignments]);
+  const unscheduled = useMemo(
+    () => assignments.filter((a) => !a.scheduledDate && !['verified', 'rejected', 'completed'].includes(a.status)),
+    [assignments],
+  );
+  const scheduledDays = useMemo(() => scheduled.map((a) => new Date(a.scheduledDate!)), [scheduled]);
+  const selected = date ? scheduled.filter((a) => sameDay(new Date(a.scheduledDate!), date)) : [];
+  const upcoming = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return scheduled
+      .filter((a) => new Date(a.scheduledDate!) >= today)
+      .sort((a, b) => new Date(a.scheduledDate!).getTime() - new Date(b.scheduledDate!).getTime());
+  }, [scheduled]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Card className="md:col-span-1 border-border/50 bg-card/50 backdrop-blur-sm">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <Card className="lg:col-span-1 border-border/50 bg-card/50 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Select Date</CardTitle>
         </CardHeader>
-        <CardContent className="flex justify-center">
+        <CardContent className="flex flex-col items-center gap-3">
           <Calendar
             mode="single"
             selected={date}
             onSelect={setDate}
+            modifiers={{ scheduled: scheduledDays }}
+            modifiersClassNames={{ scheduled: 'font-bold text-primary underline underline-offset-4 decoration-2' }}
             className="rounded-md border shadow"
           />
-        </CardContent>
-      </Card>
-
-      <Card className="md:col-span-2">
-        <CardHeader>
-          <CardTitle>
-            {date ? (
-              <span>Schedule for {date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
-            ) : (
-              <span>Select a date to view schedule</span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {selectedAssignments.length > 0 ? (
-            <div className="space-y-4">
-              {selectedAssignments.map(assignment => (
-                <div key={assignment.id} className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-secondary/30 hover:bg-secondary/50 transition-colors">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold">{assignment.id}</span>
-                      <Badge variant="outline" className="capitalize text-[10px] py-0">
-                        {assignment.status}
-                      </Badge>
-                    </div>
-                    <p className="font-semibold">{assignment.hotspotName}</p>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {assignment.assignedNgo}</span>
-                    </div>
-                  </div>
-                  
-                  <Link href={`/assignments/${assignment.id}`}>
-                    <Button variant="ghost" size="icon">
-                      <ChevronRight className="w-5 h-5" />
-                    </Button>
-                  </Link>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4">
-                <MapPin className="w-8 h-8 text-muted-foreground opacity-50" />
-              </div>
-              <p className="text-muted-foreground">No cleanup operations scheduled for this date.</p>
-            </div>
+          <p className="text-xs text-muted-foreground">Underlined dates have scheduled cleanups.</p>
+          {upcoming.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setDate(new Date(upcoming[0].scheduledDate!))}>
+              Jump to next scheduled cleanup
+            </Button>
           )}
         </CardContent>
       </Card>
+
+      <div className="lg:col-span-2 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {date
+                ? `Schedule for ${date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`
+                : 'Select a date to view schedule'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {selected.length > 0 ? (
+              <div className="space-y-3">
+                {selected.map((a) => <AssignmentRow key={a.id} assignment={a} />)}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <CalendarX className="w-10 h-10 text-muted-foreground opacity-50 mb-3" aria-hidden="true" />
+                <p className="text-muted-foreground">No cleanup operations scheduled for this date.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {unscheduled.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Open assignments without a date ({unscheduled.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {unscheduled.map((a) => <AssignmentRow key={a.id} assignment={a} />)}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

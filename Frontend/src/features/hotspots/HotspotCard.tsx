@@ -3,19 +3,45 @@
 import { Hotspot } from '@/types/hotspot';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, AlertTriangle, ArrowRight, ClipboardList, Flag } from 'lucide-react';
+import { MapPin, ClipboardList, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { CreateAssignmentDialog } from '@/features/assignments/CreateAssignmentDialog';
+import { CreateAssignmentDialog, type AssignmentTarget } from '@/features/assignments/CreateAssignmentDialog';
 
 interface HotspotCardProps {
   hotspot: Hotspot;
   index?: number;
 }
 
+export function hotspotAssignmentTarget(hotspot: Hotspot): AssignmentTarget {
+  return {
+    kind: 'hotspot',
+    hotspotId: hotspot.id,
+    detectionId: hotspot.detectionIds[0],
+    name: hotspot.name,
+    lat: hotspot.location.lat,
+    lng: hotspot.location.lng,
+    riskScore: hotspot.severityScore,
+    severity: hotspot.priority ?? undefined,
+    wasteCount: hotspot.wasteObjects,
+  };
+}
+
+export function HotspotSeverityBadge({ hotspot, size = 'sm' }: { hotspot: Hotspot; size?: 'sm' | 'md' }) {
+  if (!hotspot.priority) {
+    return (
+      <span className="shrink-0 inline-flex items-center rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+        Not assessed
+      </span>
+    );
+  }
+  return <SeverityBadge severity={hotspot.priority} size={size} className="shrink-0" />;
+}
+
 export const HotspotCard = ({ hotspot, index = 0 }: HotspotCardProps) => {
+  const closed = hotspot.status === 'resolved' || hotspot.status === 'verified';
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -33,7 +59,7 @@ export const HotspotCard = ({ hotspot, index = 0 }: HotspotCardProps) => {
             <span className="truncate">{hotspot.location.city}</span>
           </div>
         </div>
-        <SeverityBadge severity={hotspot.priority} size="sm" className="shrink-0" />
+        <HotspotSeverityBadge hotspot={hotspot} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4 mt-2">
@@ -42,23 +68,21 @@ export const HotspotCard = ({ hotspot, index = 0 }: HotspotCardProps) => {
           <span className="font-semibold text-sm">{hotspot.reportCount}</span>
         </div>
         <div className="flex flex-col bg-muted/30 rounded-xl p-2.5">
-          <span className="text-[10px] uppercase font-medium text-muted-foreground">Score</span>
-          <span className="font-semibold text-sm">{hotspot.severityScore}/100</span>
+          <span className="text-[10px] uppercase font-medium text-muted-foreground">Peak Risk</span>
+          <span className="font-semibold text-sm">{hotspot.severityScore === null ? '—' : `${hotspot.severityScore}/100`}</span>
+        </div>
+        <div className="flex flex-col bg-muted/30 rounded-xl p-2.5 col-span-2">
+          <span className="text-[10px] uppercase font-medium text-muted-foreground">Detected Objects</span>
+          <span className="font-semibold text-sm">{hotspot.wasteObjects.toLocaleString()}</span>
         </div>
       </div>
-      
-      <div className="mb-4">
-        <div className="flex justify-between text-xs mb-1.5">
-          <span className="text-muted-foreground font-medium">Cleanup Progress</span>
-          <span className="font-semibold">{hotspot.cleanupProgress}%</span>
-        </div>
-        <div className="w-full bg-muted/60 rounded-full h-1.5 overflow-hidden">
-          <div 
-            className={`h-full ${hotspot.cleanupProgress === 100 ? 'bg-emerald-500' : 'bg-primary'}`} 
-            style={{ width: `${hotspot.cleanupProgress}%` }}
-          />
-        </div>
-      </div>
+
+      {hotspot.assignedTeam && (
+        <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
+          <Users className="size-3.5" aria-hidden="true" />
+          <span className="truncate">Team: <span className="font-medium text-foreground">{hotspot.assignedTeam}</span></span>
+        </p>
+      )}
 
       <div className="flex flex-col gap-1 mb-4">
         <span className="text-[10px] uppercase font-medium text-muted-foreground">Waste Detected</span>
@@ -85,25 +109,24 @@ export const HotspotCard = ({ hotspot, index = 0 }: HotspotCardProps) => {
         </div>
         
         <div className="flex gap-2">
-          <Link href={`/hotspots/${hotspot.id}`} className="flex-1">
+          <Link href={`/hotspots/${encodeURIComponent(hotspot.id)}`} className="flex-1">
             <Button variant="outline" size="xs" className="w-full text-xs">
-              View
+              View details
             </Button>
           </Link>
-          <div className="flex-1">
-            <CreateAssignmentDialog 
-              hotspotId={hotspot.id} 
-              trigger={
-                <Button variant="default" size="xs" className="w-full text-xs gap-1">
-                  <ClipboardList className="size-3" />
-                  Assign
-                </Button>
-              }
-            />
-          </div>
-          <Button variant="secondary" size="icon-sm" className="shrink-0" title="Mark Priority">
-            <Flag className="size-3.5 text-muted-foreground" />
-          </Button>
+          {!closed && (
+            <div className="flex-1">
+              <CreateAssignmentDialog
+                target={hotspotAssignmentTarget(hotspot)}
+                trigger={
+                  <Button variant="default" size="xs" className="w-full text-xs gap-1">
+                    <ClipboardList className="size-3" aria-hidden="true" />
+                    Assign
+                  </Button>
+                }
+              />
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

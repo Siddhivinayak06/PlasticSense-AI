@@ -16,6 +16,19 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
+    # Optional extra origins matched by regex. Empty by default: only the explicit
+    # CORS_ORIGINS above may call the API from a browser.
+    CORS_ORIGIN_REGEX: Optional[str] = None
+
+    # ── Abuse protection ──────────────────────────────────────────────────────
+    # Per-client-IP limit on endpoints that run model inference (GPU-bound).
+    INFERENCE_RATE_LIMIT_PER_MINUTE: int = 30
+    MAX_BATCH_FILES: int = 10
+    # Reject images whose decoded size exceeds this many pixels (decompression bombs).
+    MAX_IMAGE_PIXELS: int = 64_000_000
+    # Seed fictional NGO teams/assignments into an EMPTY database at startup.
+    # Off by default so demo records are never mixed into real data silently.
+    SEED_SAMPLE_DATA: bool = False
 
     # ── Database ──────────────────────────────────────────────────────────────
     # Option A (preferred): set DATABASE_URL to a full Supabase / PostgreSQL URI
@@ -29,6 +42,8 @@ class Settings(BaseSettings):
     # Set true to always use the local SQLite file, ignoring DATABASE_URL.
     # When false, an unreachable DATABASE_URL falls back to SQLite automatically.
     DB_FORCE_SQLITE: bool = False
+    # Location of the SQLite fallback/forced database. Defaults to Backend/wastesense.db.
+    SQLITE_PATH: Optional[str] = None
     SUPABASE_URL: Optional[str] = None
     SUPABASE_KEY: Optional[str] = None
     SUPABASE_BUCKET_NAME: str = "images"

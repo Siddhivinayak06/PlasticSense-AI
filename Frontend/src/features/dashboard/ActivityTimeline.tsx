@@ -16,34 +16,32 @@ export function ActivityTimeline() {
 
   const activities = useMemo(() => {
     if (!assignments || assignments.length === 0) {
-      return [
-        {
-          id: 'act-1',
-          icon: ShieldCheck,
-          color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
-          description: 'AI dual-model pipeline initialized and verified',
-          timestamp: 'Live Active',
-        },
-      ];
+      return [];
     }
 
     return assignments.slice(0, 5).map((a) => {
       let icon = Clock;
       let color = 'text-amber-500 bg-amber-500/10 border-amber-500/20';
-      let desc = `Cleanup scheduled: ${a.title}`;
+      let desc = a.scheduled_date ? `Cleanup scheduled: ${a.title}` : `Cleanup created: ${a.title}`;
 
       if (a.status === 'verified') {
         icon = ShieldCheck;
         color = 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
-        desc = `AI verified ${a.waste_reduction_percent ?? 100}% reduction: ${a.title}`;
+        desc = a.waste_reduction_percent != null
+          ? `AI verified ${a.waste_reduction_percent}% reduction: ${a.title}`
+          : `AI verified: ${a.title}`;
       } else if (a.status === 'completed') {
         icon = CheckCircle2;
         color = 'text-blue-500 bg-blue-500/10 border-blue-500/20';
         desc = `Cleanup completed by ${a.ngo_team_name || 'NGO partner'}: ${a.title}`;
+      } else if (a.status === 'rejected') {
+        icon = AlertTriangle;
+        color = 'text-red-500 bg-red-500/10 border-red-500/20';
+        desc = `Verification failed (${a.waste_reduction_percent ?? 0}% reduction): ${a.title}`;
       } else if (a.status === 'in_progress') {
         icon = Clock;
         color = 'text-amber-500 bg-amber-500/10 border-amber-500/20';
-        desc = `Team deployed on site: ${a.title} (${a.waste_count} target objects)`;
+        desc = `Cleanup in progress: ${a.title} (${a.waste_count} objects reported)`;
       } else if (a.priority === 'urgent' || a.priority === 'high') {
         icon = AlertTriangle;
         color = 'text-orange-500 bg-orange-500/10 border-orange-500/20';
@@ -97,6 +95,11 @@ export function ActivityTimeline() {
             animate="visible"
             className="space-y-4 sm:space-y-5"
           >
+            {activities.length === 0 && (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                No cleanup activity yet. Assignments appear here as they are created and updated.
+              </p>
+            )}
             {activities.map((activity, index) => {
               const Icon = activity.icon;
               return (

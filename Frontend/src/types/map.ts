@@ -1,3 +1,4 @@
+/** Observed cluster as drawn on the map (see services/hotspots.ts). */
 export interface Hotspot {
   id: string;
   name: string;
@@ -5,14 +6,14 @@ export interface Hotspot {
   lng: number;
   radius: number; // in meters
   totalReports: number;
-  averageSeverity: 'low' | 'medium' | 'high' | 'critical';
-  criticalReports: number;
+  wasteObjects: number;
+  averageSeverity: 'low' | 'medium' | 'high' | 'critical' | 'unknown';
+  maxRiskScore: number | null;
   lastUpdated: string;
   priorityBadge: string;
   plasticTypes: string[];
-  cleanupProgress: number; // 0-100
-  assignedTeam: string;
-  trend: 'increasing' | 'decreasing' | 'stable';
+  status: 'pending' | 'in_progress' | 'resolved' | 'verified';
+  assignedTeam?: string;
 }
 
 export interface MapOverlayState {

@@ -1,20 +1,22 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
-import { Filter, Loader2 } from 'lucide-react';
+
+import { Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMapDetections, resolveImageUrl } from '@/services/detection';
 import { fetchHotspots } from '@/services/hotspots';
+import { detectionToReport } from '@/services/reportAdapter';
+import { downloadCsv, REPORT_CSV_HEADER, reportCsvRows } from '@/lib/csv';
 
 import { MapToolbar } from './MapToolbar';
 import { MapFilterSidebar } from './MapFilterSidebar';
 import { MapLegend } from './MapLegend';
 import { HotspotDetailPanel } from './HotspotDetailPanel';
 
-import type { Report, ReportFilters, ReportSeverity, CleanupPriority } from '@/types/report';
+import type { Report, ReportFilters } from '@/types/report';
 import type { Hotspot, MapOverlayState } from '@/types/map';
 
 // Dynamically import the map to avoid SSR issues with window/Leaflet
@@ -67,48 +69,12 @@ export function MapShell() {
   // Convert real detections to Report interface
   const realReports: Report[] = useMemo(() => {
     if (!mapData?.detections) return [];
+    // Shared adapter: fields the backend does not produce stay empty instead of invented.
     return mapData.detections
       .filter((d) => d.latitude != null && d.longitude != null)
       .map((d) => {
-        const rawSev = (d.risk?.level || d.risk?.severity || d.summary?.severity || 'low').toLowerCase();
-        const severity: ReportSeverity = ['low', 'medium', 'high', 'critical'].includes(rawSev)
-          ? (rawSev === 'moderate' ? 'medium' : rawSev as ReportSeverity)
-          : 'medium';
-
-        const rawPri = (d.risk?.cleanup_priority || d.summary?.cleanup_priority || 'low').toLowerCase();
-        const cleanupPriority: CleanupPriority = ['low', 'medium', 'high', 'urgent'].includes(rawPri)
-          ? rawPri as CleanupPriority
-          : 'medium';
-
-        const coverage = d.segmentation?.waste_coverage_percent ?? d.summary?.waste_coverage_percent;
-        const dominantGroup = d.items?.[0]?.waste_group || 'Plastic';
-        const plasticTypeLabel = `${dominantGroup.charAt(0).toUpperCase() + dominantGroup.slice(1)} Debris (${d.items?.length || 0} objects)`;
-
-        return {
-          id: d.id,
-          imageUrl: resolveImageUrl(d.annotated_image_url || d.image_url),
-          plasticType: 'other',
-          plasticTypeLabel,
-          confidence: Math.round(d.items?.length ? (d.items.reduce((s, it) => s + it.confidence, 0) / d.items.length) * 100 : 85),
-          detectedObjects: d.items?.length || 0,
-          severity,
-          cleanupPriority,
-          status: 'pending',
-          reportedDate: d.created_at,
-          lat: d.latitude!,
-          lng: d.longitude!,
-          city: `Lat ${d.latitude!.toFixed(3)}`,
-          address: `Sector ${d.latitude!.toFixed(4)}, ${d.longitude!.toFixed(4)}`,
-          assignedTeam: 'Unassigned',
-          description: d.risk?.explanation || `Detected ${d.items?.length || 0} waste objects covering ${coverage || 0}% area.`,
-          nearbyWaterBody: 'Coastal/Marine Buffer',
-          disposalMethod: 'Standard NGO Collection',
-          statusHistory: [],
-          comments: [],
-          riskScore: d.risk?.score != null ? Math.round(d.risk.score) : undefined,
-          wasteCoverage: coverage != null ? Number(coverage) : undefined,
-          locationSource: d.location_source || undefined,
-        };
+        const report = detectionToReport(d);
+        return { ...report, imageUrl: resolveImageUrl(report.imageUrl) };
       });
   }, [mapData]);
 
@@ -122,40 +88,36 @@ export function MapShell() {
       lng: h.longitude,
       radius: h.radius,
       totalReports: h.report_count,
+      wasteObjects: h.total_waste_objects,
       averageSeverity: h.severity,
-      criticalReports: h.severity === 'critical' ? h.report_count : 0,
+      maxRiskScore: h.max_risk_score,
       lastUpdated: h.last_updated,
-      priorityBadge: h.priority.toUpperCase(),
+      priorityBadge: h.severity === 'unknown' ? 'NOT ASSESSED' : `${h.severity.toUpperCase()} RISK`,
       plasticTypes: h.dominant_materials,
-      cleanupProgress: h.status === 'completed' ? 100 : h.status === 'in_progress' ? 50 : 10,
-      assignedTeam: 'Coordinated Response',
-      trend: 'stable',
+      status: h.status,
+      assignedTeam: h.assigned_team ?? undefined,
     }));
   }, [hotspotsData]);
 
   // Dynamic Map center state
   const defaultCenter: [number, number] = realReports.length > 0
     ? [realReports[0].lat, realReports[0].lng]
-    : [19.1616, 72.9473];
-  const [mapCenter, setMapCenter] = useState<[number, number]>(defaultCenter);
-  const [mapZoom, setMapZoom] = useState(realReports.length > 0 ? 11 : 5);
-
-  useEffect(() => {
-    if (realReports.length > 0) {
-      setMapCenter([realReports[0].lat, realReports[0].lng]);
-      setMapZoom(11);
-    }
-  }, [realReports]);
+    : [21.0, 78.0]; // India overview until geolocated reports exist
+  // The view follows the data until the user picks a hotspot or recentres.
+  const [userView, setUserView] = useState<{ center: [number, number]; zoom: number } | null>(null);
+  const mapCenter = userView?.center ?? defaultCenter;
+  const mapZoom = userView?.zoom ?? (realReports.length > 0 ? 11 : 5);
+  const setMapView = (center: [number, number], zoom: number) => setUserView({ center, zoom });
 
   const toggleOverlay = (key: keyof MapOverlayState) => {
     setOverlays(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const toggleFilter = <K extends keyof ReportFilters>(key: K, value: any) => {
+  const toggleFilter = <K extends keyof ReportFilters>(key: K, value: string) => {
     setFilters(f => {
       const current = f[key];
       if (Array.isArray(current)) {
-        const arr = current as any[];
+        const arr = current as string[];
         return {
           ...f,
           [key]: arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]
@@ -192,14 +154,12 @@ export function MapShell() {
 
   const handleHotspotClick = (h: Hotspot) => {
     setSelectedHotspot(h);
-    setMapCenter([h.lat, h.lng]);
-    setMapZoom(13);
+    setMapView([h.lat, h.lng], 13);
   };
 
   const handleLocate = () => {
     if (realReports.length > 0) {
-      setMapCenter([realReports[0].lat, realReports[0].lng]);
-      setMapZoom(12);
+      setMapView([realReports[0].lat, realReports[0].lng], 12);
     }
   };
 
@@ -211,7 +171,10 @@ export function MapShell() {
         toggleOverlay={toggleOverlay}
         onReset={() => setFilters(defaultFilters)}
         onLocate={handleLocate}
-        onDownload={() => {}}
+        onDownload={() => {
+          const visible = (mapData?.detections ?? []).filter((d) => filteredReports.some((r) => r.id === d.id));
+          downloadCsv(`wastesense-map-reports-${new Date().toISOString().slice(0, 10)}.csv`, REPORT_CSV_HEADER, reportCsvRows(visible));
+        }}
       />
 
       {/* Main Map */}
@@ -249,7 +212,6 @@ export function MapShell() {
         clearFilters={() => setFilters(defaultFilters)}
         hasActiveFilters={hasActiveFilters}
       />
-
 
       {/* Hotspot Detail Flyout */}
       {selectedHotspot && (

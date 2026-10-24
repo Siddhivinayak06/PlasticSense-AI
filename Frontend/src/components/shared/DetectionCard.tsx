@@ -1,3 +1,4 @@
+import type { SystemConfig } from '@/services/detection';
 import React from 'react';
 import { cn } from '@/lib/utils';
 import type { DetectionItem } from '@/types/detection';
@@ -34,7 +35,7 @@ export function ConfidenceBadge({ confidence }: ConfidenceBadgeProps) {
 interface DetectionCardProps {
   item: DetectionItem;
   index: number;
-  config?: any;
+  config?: SystemConfig | null;
 }
 
 export function DetectionCard({ item, index, config }: DetectionCardProps) {

@@ -5,7 +5,6 @@ import {
   BarChart3,
   Flame,
   ClipboardList,
-  Users,
   Settings,
   ScanLine,
   Building2,
@@ -52,7 +51,6 @@ export const sidebarMenuGroups: SidebarMenuGroup[] = [
         label: 'Hotspots',
         icon: Flame,
         href: '/hotspots',
-        badge: 5,
       },
       {
         id: 'analytics',
@@ -70,7 +68,6 @@ export const sidebarMenuGroups: SidebarMenuGroup[] = [
         label: 'Cleanup Assignments',
         icon: ClipboardList,
         href: '/assignments',
-        badge: 8,
       },
       {
         id: 'ngo-teams',
@@ -83,7 +80,6 @@ export const sidebarMenuGroups: SidebarMenuGroup[] = [
         label: 'Verification',
         icon: ShieldCheck,
         href: '/verification',
-        badge: 3,
       },
       {
         id: 'impact',
@@ -94,17 +90,11 @@ export const sidebarMenuGroups: SidebarMenuGroup[] = [
     ],
   },
   {
-    title: 'Administration',
+    title: 'System',
     items: [
       {
-        id: 'users',
-        label: 'Users',
-        icon: Users,
-        href: '/users',
-      },
-      {
         id: 'settings',
-        label: 'Settings',
+        label: 'System Status',
         icon: Settings,
         href: '/settings',
       },

@@ -1,3 +1,4 @@
+import io
 import os
 import uuid
 from typing import List, Optional, Tuple, Dict, Any
@@ -13,7 +14,6 @@ from app.application.services.feature_engine import FeatureEngine, StructuredVis
 from app.application.services.geolocation_service import (
     extract_capture_time,
     extract_gps_from_image,
-    verify_image,
 )
 from app.application.services.risk_service import RiskService
 from app.core.config import settings
@@ -21,12 +21,49 @@ from app.domain.entities.detection import Detection
 from app.domain.entities.location import Location
 from app.domain.entities.risk_assessment import RiskAssessment
 from app.infrastructure.external.storage_client import StorageClient
+from PIL import Image
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".jfif", ".bmp"}
 ALLOWED_MIME_TYPES = {
-    "image/jpeg", "image/jpg", "image/png", "image/webp",
-    "image/pjpeg", "image/x-png", "application/octet-stream"
+    "image/jpeg", "image/jpg", "image/png", "image/webp", "image/bmp",
+    "image/pjpeg", "image/x-png", "image/x-ms-bmp",
+    # Some browsers/clients send this for any binary; the bytes are sniffed anyway.
+    "application/octet-stream", "",
 }
+# Decoded container format -> the only extension we will ever store it under.
+_FORMAT_EXTENSIONS = {"JPEG": ".jpg", "MPO": ".jpg", "PNG": ".png", "WEBP": ".webp", "BMP": ".bmp"}
+
+
+class ModelUnavailableError(RuntimeError):
+    """Model weights could not be loaded; inference cannot run."""
+
+
+def sniff_image(file_bytes: bytes) -> Tuple[str, int, int]:
+    """Identify an image by its content (file signature + full decode).
+
+    Returns (canonical_extension, width, height). Raises ValueError for anything
+    that is not a fully decodable JPEG/PNG/WEBP/BMP. The stored file extension is
+    taken from here, never from the client-supplied filename, so a file named
+    ``x.html`` (or an image/HTML polyglot) can never be served back as HTML.
+    """
+    try:
+        with Image.open(io.BytesIO(file_bytes)) as img:
+            fmt = img.format
+            width, height = img.size
+            if width * height > settings.MAX_IMAGE_PIXELS:
+                raise ValueError(
+                    f"Image dimensions {width}x{height} exceed the "
+                    f"{settings.MAX_IMAGE_PIXELS:,}-pixel limit"
+                )
+            img.verify()
+    except ValueError:
+        raise
+    except Exception:
+        raise ValueError("File is not a readable image (corrupt, truncated, or mislabelled)")
+    ext = _FORMAT_EXTENSIONS.get(fmt or "")
+    if not ext:
+        raise ValueError(f"Unsupported image format '{fmt}'. Allowed types: JPG, PNG, WEBP, BMP")
+    return ext, width, height
 
 
 class DetectionService:
@@ -59,16 +96,21 @@ class DetectionService:
         if len(dto.file_bytes) > max_bytes:
             raise ValueError(f"File size exceeds maximum allowed limit of {settings.MAX_UPLOAD_SIZE_MB}MB")
 
-        ext = os.path.splitext(dto.filename)[1].lower() if dto.filename else ".jpg"
-        content_type = (dto.content_type or "").lower()
-        is_valid_ext = ext in ALLOWED_EXTENSIONS
-        is_valid_mime = content_type in ALLOWED_MIME_TYPES or content_type.startswith("image/")
-        if not (is_valid_ext or is_valid_mime):
-            raise ValueError(f"Unsupported file type '{ext or content_type}'. Allowed types: JPG, PNG, WEBP")
+        # Client-supplied claims must be plausible...
+        claimed_ext = os.path.splitext(dto.filename or "")[1].lower()
+        if claimed_ext and claimed_ext not in ALLOWED_EXTENSIONS:
+            raise ValueError(f"Unsupported file type '{claimed_ext}'. Allowed types: JPG, PNG, WEBP, BMP")
+        content_type = (dto.content_type or "").split(";")[0].strip().lower()
+        if content_type not in ALLOWED_MIME_TYPES:
+            raise ValueError(f"Unsupported content type '{content_type}'. Allowed types: JPG, PNG, WEBP, BMP")
+        # ...and the bytes themselves are authoritative.
+        stored_ext, _, _ = sniff_image(dto.file_bytes)
+        stored_name = f"upload{stored_ext}"
 
-        # Extension and MIME are client-supplied claims; confirm the bytes decode.
-        if not verify_image(dto.file_bytes):
-            raise ValueError("File is not a readable image (corrupt, truncated, or mislabelled)")
+        # Fail before persisting anything if the model weights never loaded.
+        unavailable = getattr(self.ml_client, "unavailable_reason", None)
+        if unavailable:
+            raise ModelUnavailableError(unavailable)
 
         # ── 2. Resolve location: explicit coordinates win, then EXIF, then OCR ──
         # An operator who types coordinates is correcting the automatic extraction,
@@ -97,7 +139,7 @@ class DetectionService:
         captured_at = extract_capture_time(dto.file_bytes)
 
         # Store original image locally (never overwritten; annotated output is separate)
-        image_url = self.storage_client.save_file(dto.file_bytes, dto.filename)
+        image_url = self.storage_client.save_file(dto.file_bytes, stored_name)
 
         # Construct initial Detection record
         detection = Detection(
@@ -132,7 +174,8 @@ class DetectionService:
 
             # Save annotated visualization image (combined segmentation + boxes)
             if prediction.annotated_image_bytes:
-                result_filename = f"annotated_{dto.filename}"
+                # Annotated output is always JPEG-encoded by the ML client.
+                result_filename = "annotated.jpg"
                 saved.annotated_image_url = self.result_storage_client.save_file(
                     prediction.annotated_image_bytes, result_filename
                 )

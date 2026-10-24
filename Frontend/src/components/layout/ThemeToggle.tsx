@@ -1,16 +1,12 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
+import { useMounted } from '@/hooks/useMounted';
 import { AnimatedThemeToggler } from '@/registry/magicui/animated-theme-toggler';
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   const currentTheme = (resolvedTheme || theme || 'dark') as 'light' | 'dark';
 

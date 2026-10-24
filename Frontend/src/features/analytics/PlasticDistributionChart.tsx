@@ -6,10 +6,17 @@ import { Box } from 'lucide-react';
 import type { PlasticDistributionData } from '@/types/analytics';
 
 interface PlasticDistributionChartProps {
+  /** value is a percentage share */
   data: PlasticDistributionData[];
+  title?: string;
+  description?: string;
 }
 
-export function PlasticDistributionChart({ data }: PlasticDistributionChartProps) {
+export function PlasticDistributionChart({
+  data,
+  title = 'Plastic Type Distribution',
+  description = 'Breakdown of reported pollution by material type.',
+}: PlasticDistributionChartProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -20,11 +27,14 @@ export function PlasticDistributionChart({ data }: PlasticDistributionChartProps
       <div className="mb-2">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Box className="size-4 text-cyan-500" />
-          Plastic Type Distribution
+          {title}
         </h3>
-        <p className="text-xs text-muted-foreground mt-1">Breakdown of reported pollution by material type.</p>
+        <p className="text-xs text-muted-foreground mt-1">{description}</p>
       </div>
 
+      {data.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-16 text-center">No detections stored yet.</p>
+      ) : (
       <div className="flex-1 min-h-[300px] w-full mt-4">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -32,8 +42,8 @@ export function PlasticDistributionChart({ data }: PlasticDistributionChartProps
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={75}
-              outerRadius={105}
+              innerRadius="55%"
+              outerRadius="80%"
               paddingAngle={2}
               dataKey="value"
               stroke="none"
@@ -46,7 +56,7 @@ export function PlasticDistributionChart({ data }: PlasticDistributionChartProps
             <Tooltip 
               contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
               itemStyle={{ color: 'hsl(var(--foreground))' }}
-              formatter={(value: any) => [`${value}%`, 'Share']}
+              formatter={(value) => [`${value}%`, 'Share']}
             />
             <Legend 
               iconType="circle" 
@@ -58,6 +68,7 @@ export function PlasticDistributionChart({ data }: PlasticDistributionChartProps
           </PieChart>
         </ResponsiveContainer>
       </div>
+      )}
     </motion.div>
   );
 }

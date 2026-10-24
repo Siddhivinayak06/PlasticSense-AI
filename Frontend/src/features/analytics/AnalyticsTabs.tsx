@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 const tabs = [
   { name: 'Overview', href: '/analytics', icon: LayoutDashboard },
   { name: 'Trends Analysis', href: '/analytics/trends', icon: TrendingUp },
-  { name: 'Plastic Insights', href: '/analytics/plastics', icon: Box },
+  { name: 'Material Insights', href: '/analytics/plastics', icon: Box },
   { name: 'Performance', href: '/analytics/performance', icon: Activity },
 ];
 

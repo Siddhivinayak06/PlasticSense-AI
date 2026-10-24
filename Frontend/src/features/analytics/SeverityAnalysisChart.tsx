@@ -20,11 +20,14 @@ export function SeverityAnalysisChart({ data }: SeverityAnalysisChartProps) {
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <AlertTriangle className="size-4 text-orange-500" />
-          Severity by Region
+          Risk Assessments by Severity
         </h3>
-        <p className="text-xs text-muted-foreground mt-1">Stacked analysis of report severities across top cities.</p>
+        <p className="text-xs text-muted-foreground mt-1">Daily count of risk assessments, stacked by severity level.</p>
       </div>
 
+      {data.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-16 text-center">No risk assessments stored yet.</p>
+      ) : (
       <div className="flex-1 min-h-[300px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
@@ -36,13 +39,14 @@ export function SeverityAnalysisChart({ data }: SeverityAnalysisChartProps) {
               cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
             />
             <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-            <Bar dataKey="low" name="Low" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} barSize={32} />
+            <Bar dataKey="low" name="Low" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} maxBarSize={32} />
             <Bar dataKey="medium" name="Medium" stackId="a" fill="#facc15" />
             <Bar dataKey="high" name="High" stackId="a" fill="#f97316" />
             <Bar dataKey="critical" name="Critical" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
+      )}
     </motion.div>
   );
 }

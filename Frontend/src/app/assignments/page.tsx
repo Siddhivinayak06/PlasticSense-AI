@@ -1,88 +1,25 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchAssignments, type AssignmentItem } from '@/services/assignments';
+import { fetchAssignments, toCleanupAssignment } from '@/services/assignments';
+import { QueryError } from '@/components/shared/QueryError';
 import { CleanupDashboard } from '@/features/assignments/CleanupDashboard';
-import { ClipboardList, CalendarDays, Download, Loader2 } from 'lucide-react';
+import { ClipboardList, CalendarDays, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { CreateAssignmentDialog } from '@/features/assignments/CreateAssignmentDialog';
-import type { CleanupAssignment, AssignmentStatus } from '@/types/assignment';
-import type { Priority } from '@/types/hotspot';
+import type { CleanupAssignment } from '@/types/assignment';
 import { useMemo } from 'react';
 
-function mapBackendToCleanupAssignment(item: AssignmentItem): CleanupAssignment {
-  const statusMap: Record<string, AssignmentStatus> = {
-    'pending': 'pending',
-    'assigned': 'assigned',
-    'in_progress': 'in-progress',
-    'completed': 'completed',
-    'verified': 'verified',
-    'rejected': 'closed',
-  };
-
-  const status: AssignmentStatus = statusMap[item.status] || 'pending';
-  const priority: Priority = ['critical', 'high', 'medium', 'low'].includes(item.priority)
-    ? (item.priority as Priority)
-    : 'medium';
-
-  const progress = status === 'verified' || status === 'completed'
-    ? 100
-    : status === 'in-progress'
-    ? 50
-    : status === 'assigned'
-    ? 25
-    : 0;
-
-  return {
-    id: item.id,
-    hotspotId: item.hotspot_id || item.detection_id || 'HS-2026-01',
-    hotspotName: item.location_name || item.title,
-    assignedNgo: item.ngo_team_name || 'Pending Assignment',
-    team: {
-      id: item.ngo_team_id || 'team-default',
-      name: item.ngo_team_name || 'Volunteers',
-      ngo: item.ngo_team_name || 'Pending NGO',
-      volunteers: [
-        { id: 'v1', name: 'Field Supervisor', role: 'leader' },
-        { id: 'v2', name: 'Logistics Lead', role: 'member' },
-      ],
-    },
-    assignedDate: item.created_at,
-    scheduledDate: item.scheduled_date || item.created_at,
-    completionDate: item.completed_date || undefined,
-    status,
-    priority,
-    progress,
-    equipmentChecklist: [
-      { id: 'eq-1', label: 'Heavy Duty Waste Bags & Gloves', completed: status !== 'pending' },
-      { id: 'eq-2', label: 'Tongs / Debris Pickers', completed: status !== 'pending' },
-      { id: 'eq-3', label: 'Safety Vests & First Aid Kit', completed: true },
-      { id: 'eq-4', label: 'Transport / Collection Truck', completed: status === 'in-progress' || status === 'completed' },
-    ],
-    timeline: [
-      { id: 'tl-1', stage: 'reported', label: 'Pollution Reported & Assessed', date: item.created_at, completed: true },
-      { id: 'tl-2', stage: 'assigned', label: `Assigned to ${item.ngo_team_name || 'NGO Partner'}`, date: item.scheduled_date || item.created_at, completed: status !== 'pending' },
-      { id: 'tl-3', stage: 'started', label: 'Cleanup Crew Deployed', date: item.scheduled_date || item.created_at, completed: status === 'in-progress' || status === 'completed' || status === 'verified' },
-      { id: 'tl-4', stage: 'completed', label: 'Field Cleanup Concluded', date: item.completed_date || item.created_at, completed: status === 'completed' || status === 'verified' },
-      { id: 'tl-5', stage: 'inspection', label: 'AI Post-Cleanup Inspection', date: item.completed_date || item.created_at, completed: status === 'verified' },
-    ],
-    estimatedDurationHours: 4,
-    imagesBefore: item.before_image_url ? [item.before_image_url] : undefined,
-    imagesAfter: item.after_image_url ? [item.after_image_url] : undefined,
-    supervisorNotes: item.notes || `Risk Score: ${item.risk_score}/100. Target waste count: ${item.waste_count} items.`,
-  };
-}
-
 export default function AssignmentsPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['assignments'],
     queryFn: () => fetchAssignments(),
   });
 
   const assignments: CleanupAssignment[] = useMemo(() => {
     if (!data) return [];
-    return data.map(mapBackendToCleanupAssignment);
+    return data.map(toCleanupAssignment);
   }, [data]);
 
   return (
@@ -94,7 +31,7 @@ export default function AssignmentsPage() {
             Cleanup Dashboard
           </h1>
           <p className="text-muted-foreground mt-1">
-            Manage real cleanup assignments, monitor progress, and coordinate with NGOs.
+            Track cleanup assignments from creation to AI-verified completion.
           </p>
         </div>
 
@@ -109,7 +46,9 @@ export default function AssignmentsPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <QueryError onRetry={() => refetch()} />
+      ) : isLoading ? (
         <div className="flex h-64 items-center justify-center rounded-2xl border border-border/50 bg-muted/20">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>

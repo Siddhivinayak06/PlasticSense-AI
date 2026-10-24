@@ -1,5 +1,7 @@
 'use client';
 
+import { PageLoader } from '@/components/shared/PageLoader';
+import { QueryError } from '@/components/shared/QueryError';
 import { motion } from 'framer-motion';
 import {
   TrendingUp,
@@ -7,10 +9,8 @@ import {
   Layers,
   CheckCircle,
   Flame,
-  Building2,
   ShieldCheck,
   Percent,
-  Loader2,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
@@ -18,23 +18,26 @@ import { fetchImpact, fetchAnalytics } from '@/services/analytics';
 import { cn } from '@/lib/utils';
 
 export default function ImpactPage() {
-  const { data: impact, isLoading: isImpactLoading } = useQuery({
+  const { data: impact, isLoading: isImpactLoading, isError, refetch } = useQuery({
     queryKey: ['impact'],
     queryFn: fetchImpact,
   });
 
-  const { data: analytics, isLoading: isAnalyticsLoading } = useQuery({
+  const { data: analytics } = useQuery({
     queryKey: ['analytics'],
     queryFn: fetchAnalytics,
   });
 
-  const totalDetections = impact?.total_detections ?? 32;
-  const totalObjects = impact?.total_objects_detected ?? 68;
-  const highRiskSites = impact?.high_risk_sites ?? 3;
-  const completedCleanups = impact?.completed_cleanups ?? 2;
-  const verifiedCleanups = impact?.verified_cleanups ?? 1;
-  const avgReduction = impact?.avg_waste_reduction ?? 100;
-  const activeNgos = impact?.active_ngos ?? 5;
+  if (isImpactLoading) return <PageLoader label="Computing impact metrics…" />;
+  if (isError || !impact) return <QueryError onRetry={() => refetch()} />;
+
+  const totalDetections = impact.total_detections;
+  const totalObjects = impact.total_objects_detected;
+  const highRiskSites = impact.high_risk_sites;
+  const completedCleanups = impact.completed_cleanups;
+  const verifiedCleanups = impact.verified_cleanups;
+  const avgReduction = impact.avg_waste_reduction;
+  const activeNgos = impact.active_ngos;
 
   const impactMetrics = [
     {
@@ -79,32 +82,16 @@ export default function ImpactPage() {
     },
     {
       id: 'reduction',
-      label: 'Avg Surface Cleared',
-      value: `${avgReduction}%`,
+      label: 'Avg Reduction in Detected Objects',
+      value: avgReduction === null ? '—' : `${avgReduction}%`,
       icon: Percent,
       color: 'text-violet-600 dark:text-violet-400',
       bg: 'bg-violet-500/10'
     },
   ];
 
-  const categoryImpact = impact?.category_impact && impact.category_impact.length > 0
-    ? impact.category_impact
-    : [
-        { category: 'Plastic Waste', collected: 24, percentage: 35.3 },
-        { category: 'Paper Waste', collected: 18, percentage: 26.5 },
-        { category: 'Metal Waste', collected: 12, percentage: 17.6 },
-        { category: 'Glass Waste', collected: 8, percentage: 11.8 },
-        { category: 'Other Debris', collected: 6, percentage: 8.8 },
-      ];
-
-  const timelineData = analytics?.time_series && analytics.time_series.length > 0
-    ? analytics.time_series
-    : [
-        { date: 'Day 1', total: 4, resolved: 3 },
-        { date: 'Day 2', total: 8, resolved: 6 },
-        { date: 'Day 3', total: 12, resolved: 9 },
-        { date: 'Day 4', total: 18, resolved: 14 },
-      ];
+  const categoryImpact = impact.category_impact;
+  const timelineData = analytics?.time_series ?? [];
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
@@ -115,7 +102,8 @@ export default function ImpactPage() {
           Environmental Impact
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Empirical, defensible operational metrics computed from field dual-model detections and NGO cleanups.
+          Operational metrics counted from stored detections and cleanup assignments.
+          {avgReduction === null && ' Reduction figures appear once a cleanup has been AI-verified.'}
         </p>
       </div>
 
@@ -173,8 +161,8 @@ export default function ImpactPage() {
               <Tooltip
                 contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '12px' }}
               />
-              <Bar dataKey="total" fill="#06b6d4" radius={[6, 6, 0, 0]} name="Objects Surveyed" />
-              <Bar dataKey="resolved" fill="#10b981" radius={[6, 6, 0, 0]} name="Objects Cleared" />
+              <Bar dataKey="total" fill="#06b6d4" radius={[6, 6, 0, 0]} name="Reports Received" />
+              <Bar dataKey="resolved" fill="#10b981" radius={[6, 6, 0, 0]} name="Cleanups Completed" />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
@@ -195,7 +183,7 @@ export default function ImpactPage() {
               <Tooltip
                 contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '12px' }}
               />
-              <Bar dataKey="collected" fill="#16A34A" radius={[0, 6, 6, 0]} name="Items Detected" />
+              <Bar dataKey="collected" fill="#16A34A" radius={[0, 6, 6, 0]} name="Objects Detected" />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>

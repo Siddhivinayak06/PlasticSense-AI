@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { Search, Filter, X } from 'lucide-react';
 
 interface HotspotFiltersProps {
   onSearch: (term: string) => void;
-  onFilterChange: (filters: any) => void;
+  onFilterChange: (filters: { priority: string[]; status: string[] }) => void;
 }
 
 const PRIORITIES = ['critical', 'high', 'medium', 'low'];
@@ -64,6 +64,7 @@ export const HotspotFilters = ({ onSearch, onFilterChange }: HotspotFiltersProps
             {PRIORITIES.map(p => (
               <Badge
                 key={p}
+                render={<button type="button" aria-pressed={activeFilters.priority.includes(p)} />}
                 variant={activeFilters.priority.includes(p) ? 'default' : 'outline'}
                 className={`cursor-pointer capitalize text-xs px-2.5 py-0.5 rounded-full ${activeFilters.priority.includes(p) ? '' : 'hover:bg-muted/60 text-muted-foreground'}`}
                 onClick={() => toggleFilter('priority', p)}
@@ -75,6 +76,7 @@ export const HotspotFilters = ({ onSearch, onFilterChange }: HotspotFiltersProps
             {STATUSES.map(s => (
               <Badge
                 key={s}
+                render={<button type="button" aria-pressed={activeFilters.status.includes(s)} />}
                 variant={activeFilters.status.includes(s) ? 'default' : 'outline'}
                 className={`cursor-pointer capitalize text-xs px-2.5 py-0.5 rounded-full ${activeFilters.status.includes(s) ? '' : 'hover:bg-muted/60 text-muted-foreground'}`}
                 onClick={() => toggleFilter('status', s)}
