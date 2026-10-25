@@ -55,20 +55,21 @@ class Settings(BaseSettings):
 
     # ── Model pipeline paths ──────────────────────────────────────────────────
     # Model selection rationale and evidence: docs/MODEL_SELECTION.md
-    # Detector  = 22-class YOLOv8n ("best.pt"). Chosen over plasticsense_detector_best.pt,
-    #             which produced only 5 detections across 31 target-domain images even at
-    #             its native 960px, vs 103 for this one.
+    # Detector  = BiaEye YOLO11s (6-class: plastic/paper/glass/metal/organic/bulky).
+    #             Produces 30+ detections per dumpsite image vs 2-4 for the previous
+    #             22-class YOLOv8n which also mislabelled plastic as scrap_paper.
+    #             Rollback: change DETECTOR_MODEL_PATH to "best_22cls_original.pt".
     # Segmenter = YOLO11s-seg TACO 5-material model, run at its native 960px.
-    DETECTOR_MODEL_PATH: str = "best.pt"
+    DETECTOR_MODEL_PATH: str = "models/external/biaeye-yolo11s/best.pt"
     SEGMENTER_MODEL_PATH: str = "taco_segmentation_best.pt"
     ARCHIVE_MODEL_PATH: str = "best.pt"
     MODEL_WEIGHTS_PATH: str = "best.pt"  # Legacy backwards compatibility
 
     # Model inference parameters
-    # 0.25 is the Ultralytics default. The previous 0.06/0.10 values were compensating
-    # for a detector that barely fired on this domain; with the detector swapped they
-    # only manufacture false positives.
-    DETECTOR_CONF_THRESHOLD: float = 0.25
+    # High-recall configuration: 0.18 captures dense, weathered dumpsite waste
+    # that clusters in the 0.18-0.30 confidence band, while containment deduplication
+    # (IoM >= 0.80) suppresses redundant duplicate boxes without losing separate items.
+    DETECTOR_CONF_THRESHOLD: float = 0.18
     SEGMENTER_CONF_THRESHOLD: float = 0.25
     DETECTOR_IOU_THRESHOLD: float = 0.45
     SEGMENTER_IOU_THRESHOLD: float = 0.50

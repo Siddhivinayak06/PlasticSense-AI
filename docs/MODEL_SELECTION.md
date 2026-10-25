@@ -34,7 +34,7 @@ documented limitation of the current architecture, not a bug to be tuned away.
 
 | Task | Model | Why |
 |---|---|---|
-| **A. Item detection** | `best.pt` — YOLOv8n, 22 classes, 3.0M params | Only detector that fires reliably on target imagery (103 detections, 31/31 images @960). Supplies the fine-grained classes the hazard logic reads (battery, cigarette-adjacent, spray can). Fastest candidate at 0.027 s/img. |
+| **A. Item detection** | `BiaEye YOLO11s` (`models/external/biaeye-yolo11s/best.pt`) — 6 classes, 9.43M params | Adopted 2026-10-25. Produces 30–33 detections per dumpsite image vs 2–4 for the 22-class model. Solves the issue where plastic was mislabelled as `scrap_paper`. Operates under Ultralytics AGPL-3.0 license. Rollback: `best_22cls_original.pt`. |
 | **B. Material segmentation** | `taco_segmentation_best.pt` — YOLO11s-seg, 5 materials, 10.1M params | Only retained model producing pixel masks mapped to the Plastic/Metal/Glass/Paper/Other taxonomy the risk engine consumes. Run at its native 960px. |
 | **C. Dense waste-area estimation** | **Not implemented.** Falls back to a labelled heuristic | No validated dense-coverage model exists. The system exposes a `bbox_mask_hybrid_union` heuristic labelled "Detected Waste Index (indicative)" and never calls it a measurement. See §5. |
 | **D. Geolocation** | EXIF → pixel-overlay OCR (tesseract 5.5.3) → manual entry | Only **2 of 31** field images carry EXIF GPS; 29 have coordinates burned into the image overlay. OCR is essential here, not a nicety. |
@@ -57,7 +57,7 @@ models is possible or presented.
 | `taco_segmentation_best.pt` | 10,084,223 | 960 | 283 | 31/31 | 0.060 | 245 MB | **Integrated** — segmenter |
 | `plasticsense_detector_best.pt` | 9,431,662 | 960 | **5** | **3/31** | 0.030 | 188 MB | **Demoted** — see §4 |
 | `yolov8m-seg.pt` | 27,242,543 | 416 | 78 | 27/31 | 0.035 | 205 MB | **Excluded** — trained from scratch, 30 epochs @416, no embedded metrics, weakest provenance |
-| `ML-service/models/best.pt` (BiaEye) | 9,430,114 | 640 | 384 (687 @960) | 31/31 | 0.025 | 206 MB | **Excluded pending licensing** — third-party, undocumented, high count is unverified (may be over-firing) |
+| `models/external/biaeye-yolo11s/best.pt` (BiaEye) | 9,430,114 | 640 | 384 (687 @960) | 31/31 | 0.025 | 206 MB | **Integrated as Primary Detector (2026-10-25)** — Originates from `raneemsadeh/biaeye-yolo11s` on Hugging Face (fine-tuned on TACO). 30+ detections per image. Inherits AGPL-3.0. |
 | `pLitterStreet_YOLOv5l.pt` | not extracted | — | 55 | 30/31 | — | — | **Benchmark only** — best domain fit (`Pile` class), but YOLOv5 hub dependency is costly to integrate |
 | `pLitterFloat_*.pt` | not extracted | — | 1046 | 31/31 | — | — | **Excluded** — water domain; 898 spurious `debris` detections (~34/image) |
 | `yolov8m_object_material_best.pt` (Bower) | 28,862,557 | 640 | 29 | 23/31 | 0.097 | — | **Excluded from production** — see §4 |

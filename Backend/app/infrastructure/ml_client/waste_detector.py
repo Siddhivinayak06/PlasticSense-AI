@@ -159,19 +159,28 @@ class WasteDetector(IWasteDetector):
                     ix2, iy2 = min(w_img, int(x2)), min(h_img, int(y2))
 
                     raw_name = self.class_names.get(cls_id, f"class_{cls_id}").capitalize()
-                    # Map to waste group
+                    # Map to waste group.
+                    # First try the mapping file (handles fine-grained class names like
+                    # plastic_bottle → plastic). If no mapping exists, try common-sense
+                    # keyword matching. For broad material-level models (e.g. BiaEye
+                    # with classes like "plastic", "metal", "glass") the name IS the group.
                     waste_group = self.waste_mapping.get(raw_name.lower())
                     if not waste_group:
                         lowered = raw_name.lower()
-                        if "plastic" in lowered or any(k in lowered for k in ["bottle", "cup", "wrapper", "bag", "tub", "tray", "jug", "lid"]):
+                        # Direct material-level class names (BiaEye-style)
+                        if lowered in ("plastic", "metal", "glass", "paper", "organic"):
+                            waste_group = lowered
+                        elif lowered == "bulky":
+                            waste_group = "other"
+                        elif any(k in lowered for k in ["bottle", "cup", "wrapper", "bag", "tub", "tray", "jug", "lid", "cap", "straw", "cultery"]):
                             waste_group = "plastic"
-                        elif "metal" in lowered or any(k in lowered for k in ["can", "tin", "cylinder", "aerosol"]):
+                        elif any(k in lowered for k in ["can", "tin", "cylinder", "aerosol"]):
                             waste_group = "metal"
-                        elif "glass" in lowered or "jar" in lowered:
+                        elif "jar" in lowered:
                             waste_group = "glass"
-                        elif "paper" in lowered or "carton" in lowered or "fiber" in lowered or "cardboard" in lowered:
+                        elif any(k in lowered for k in ["carton", "fiber", "cardboard"]):
                             waste_group = "paper"
-                        elif "cigarette" in lowered or "hazard" in lowered or "battery" in lowered:
+                        elif any(k in lowered for k in ["cigarette", "hazard", "battery"]):
                             waste_group = "hazardous"
                         elif "electronic" in lowered:
                             waste_group = "electronic"
@@ -194,6 +203,57 @@ class WasteDetector(IWasteDetector):
                         # honest value here.
                         "waste_type": "unknown",
                     })
+
+                # Stage 1b: Containment-aware deduplication (IoM > 0.75)
+                # Suppress smaller duplicate boxes engulfed (>75%) inside a larger box
+                # of the same class, while strictly preserving genuinely separate objects.
+                if len(parsed_boxes) > 1:
+                    def _box_area(b):
+                        return max(0.0, b["x2"] - b["x1"]) * max(0.0, b["y2"] - b["y1"])
+
+                    def _box_intersection(b1, b2):
+                        ix1 = max(b1["x1"], b2["x1"])
+                        iy1 = max(b1["y1"], b2["y1"])
+                        ix2 = min(b1["x2"], b2["x2"])
+                        iy2 = min(b1["y2"], b2["y2"])
+                        return max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+
+                    sorted_boxes = sorted(parsed_boxes, key=lambda b: b["conf"], reverse=True)
+                    deduped_boxes = []
+                    suppressed_indices = set()
+
+                    for idx, b_high in enumerate(sorted_boxes):
+                        if idx in suppressed_indices:
+                            continue
+                        deduped_boxes.append(b_high)
+                        area_high = _box_area(b_high)
+                        if area_high <= 0:
+                            continue
+
+                        for jdx in range(idx + 1, len(sorted_boxes)):
+                            if jdx in suppressed_indices:
+                                continue
+                            b_low = sorted_boxes[jdx]
+                            if b_low["cls_id"] != b_high["cls_id"]:
+                                continue
+
+                            area_low = _box_area(b_low)
+                            if area_low <= 0:
+                                continue
+
+                            inter = _box_intersection(b_high, b_low)
+                            min_area = min(area_high, area_low)
+                            iom = inter / min_area if min_area > 0 else 0.0
+
+                            # Suppress only if heavily engulfed (>= 80%) inside larger box
+                            if iom >= 0.80:
+                                suppressed_indices.add(jdx)
+                                logger.debug(
+                                    "Suppressed duplicate nested box '%s' (conf=%.2f, IoM=%.2f) inside box (conf=%.2f)",
+                                    b_low["raw_name"], b_low["conf"], iom, b_high["conf"]
+                                )
+
+                    parsed_boxes = deduped_boxes
 
                 # Build final detection items
                 for p_box in parsed_boxes:
@@ -219,7 +279,7 @@ class WasteDetector(IWasteDetector):
                     for p_box in parsed_boxes:
                         x1, y1 = max(0, int(p_box["x1"])), max(0, int(p_box["y1"]))
                         x2, y2 = min(w_img, int(p_box["x2"])), min(h_img, int(p_box["y2"]))
-                        lbl = f"{p_box['raw_name']} {int(p_box['conf'] * 100)}%"
+                        lbl = f"{p_box['raw_name']} {int(p_box['conf'] * 100)}% conf"
 
                         grp = p_box["waste_group"]
                         if grp == "plastic":

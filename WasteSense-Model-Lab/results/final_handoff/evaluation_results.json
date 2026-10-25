@@ -1,0 +1,269 @@
+{
+  "BiaEye_YOLO11s": {
+    "classes": [
+      "plastic",
+      "paper",
+      "glass",
+      "metal",
+      "organic",
+      "bulky"
+    ],
+    "class_count": 6,
+    "total_detections": 50,
+    "total_duplicates": 10,
+    "avg_latency_ms": 5677,
+    "peak_vram_mb": 196.9,
+    "records": [
+      {
+        "image": "0956e02a97954215857ec5dbfac4182f.jpeg",
+        "detections": 30,
+        "duplicates": 4,
+        "classes": {
+          "Plastic": 29,
+          "Metal": 1
+        },
+        "time_ms": 16998,
+        "vram_mb": 174.4
+      },
+      {
+        "image": "2c41e06b6790456cafa2edd24bd3fb20.jpg",
+        "detections": 11,
+        "duplicates": 6,
+        "classes": {
+          "Metal": 7,
+          "Plastic": 3,
+          "Glass": 1
+        },
+        "time_ms": 15,
+        "vram_mb": 196.9
+      },
+      {
+        "image": "2a6fbd4b0b2149c7b85c016e7e1608ab.jpg",
+        "detections": 9,
+        "duplicates": 0,
+        "classes": {
+          "Plastic": 7,
+          "Metal": 1,
+          "Paper": 1
+        },
+        "time_ms": 19,
+        "vram_mb": 196.9
+      }
+    ]
+  },
+  "BiaEye_YOLO11s_Cleaned": {
+    "classes": [
+      "plastic",
+      "paper",
+      "glass",
+      "metal",
+      "organic",
+      "bulky"
+    ],
+    "class_count": 6,
+    "total_detections": 36,
+    "total_duplicates": 0,
+    "avg_latency_ms": 83,
+    "peak_vram_mb": 209.6,
+    "records": [
+      {
+        "image": "0956e02a97954215857ec5dbfac4182f.jpeg",
+        "detections": 23,
+        "duplicates": 0,
+        "classes": {
+          "Plastic": 22,
+          "Metal": 1
+        },
+        "time_ms": 128,
+        "vram_mb": 209.6
+      },
+      {
+        "image": "2c41e06b6790456cafa2edd24bd3fb20.jpg",
+        "detections": 7,
+        "duplicates": 0,
+        "classes": {
+          "Metal": 3,
+          "Plastic": 3,
+          "Glass": 1
+        },
+        "time_ms": 59,
+        "vram_mb": 209.6
+      },
+      {
+        "image": "2a6fbd4b0b2149c7b85c016e7e1608ab.jpg",
+        "detections": 6,
+        "duplicates": 0,
+        "classes": {
+          "Plastic": 4,
+          "Metal": 1,
+          "Paper": 1
+        },
+        "time_ms": 60,
+        "vram_mb": 209.6
+      }
+    ]
+  },
+  "YOLOv8n_22cls": {
+    "classes": [
+      "battery",
+      "can",
+      "cardboard_bowl",
+      "cardboard_box",
+      "chemical_plastic_bottle",
+      "chemical_plastic_gallon",
+      "chemical_spray_can",
+      "light_bulb",
+      "paint_bucket",
+      "plastic_bag",
+      "plastic_bottle",
+      "plastic_bottle_cap",
+      "plastic_box",
+      "plastic_cultery",
+      "plastic_cup",
+      "plastic_cup_lid",
+      "reuseable_paper",
+      "scrap_paper",
+      "scrap_plastic",
+      "snack_bag",
+      "stick",
+      "straw"
+    ],
+    "class_count": 22,
+    "total_detections": 10,
+    "total_duplicates": 0,
+    "avg_latency_ms": 35,
+    "peak_vram_mb": 156.1,
+    "records": [
+      {
+        "image": "0956e02a97954215857ec5dbfac4182f.jpeg",
+        "detections": 4,
+        "duplicates": 0,
+        "classes": {
+          "Plastic_bag": 1,
+          "Scrap_plastic": 1,
+          "Scrap_paper": 2
+        },
+        "time_ms": 82,
+        "vram_mb": 156.1
+      },
+      {
+        "image": "2c41e06b6790456cafa2edd24bd3fb20.jpg",
+        "detections": 2,
+        "duplicates": 0,
+        "classes": {
+          "Can": 2
+        },
+        "time_ms": 11,
+        "vram_mb": 156.1
+      },
+      {
+        "image": "2a6fbd4b0b2149c7b85c016e7e1608ab.jpg",
+        "detections": 4,
+        "duplicates": 0,
+        "classes": {
+          "Cardboard_box": 4
+        },
+        "time_ms": 13,
+        "vram_mb": 156.1
+      }
+    ]
+  },
+  "PlasticSense_YOLO11s": {
+    "classes": [
+      "plastic_bottle",
+      "plastic_bag_wrapper",
+      "plastic_container_cup",
+      "plastic_cap_lid",
+      "plastic_straw",
+      "other_plastic",
+      "metal_can",
+      "glass",
+      "paper_carton",
+      "cigarette"
+    ],
+    "class_count": 10,
+    "total_detections": 2,
+    "total_duplicates": 0,
+    "avg_latency_ms": 35,
+    "peak_vram_mb": 257.8,
+    "records": [
+      {
+        "image": "0956e02a97954215857ec5dbfac4182f.jpeg",
+        "detections": 0,
+        "duplicates": 0,
+        "classes": {},
+        "time_ms": 79,
+        "vram_mb": 257.8
+      },
+      {
+        "image": "2c41e06b6790456cafa2edd24bd3fb20.jpg",
+        "detections": 2,
+        "duplicates": 0,
+        "classes": {
+          "Plastic_bottle": 1,
+          "Plastic_cap_lid": 1
+        },
+        "time_ms": 12,
+        "vram_mb": 257.8
+      },
+      {
+        "image": "2a6fbd4b0b2149c7b85c016e7e1608ab.jpg",
+        "detections": 0,
+        "duplicates": 0,
+        "classes": {},
+        "time_ms": 13,
+        "vram_mb": 257.8
+      }
+    ]
+  },
+  "TACO_YOLO11s_Seg": {
+    "classes": [
+      "Plastic",
+      "Metal",
+      "Glass",
+      "Paper",
+      "Other"
+    ],
+    "class_count": 5,
+    "total_detections": 20,
+    "total_duplicates": 2,
+    "avg_latency_ms": 49,
+    "peak_vram_mb": 306.1,
+    "records": [
+      {
+        "image": "0956e02a97954215857ec5dbfac4182f.jpeg",
+        "detections": 6,
+        "duplicates": 0,
+        "classes": {
+          "Plastic": 3,
+          "Other": 1,
+          "Metal": 2
+        },
+        "time_ms": 116,
+        "vram_mb": 300.0
+      },
+      {
+        "image": "2c41e06b6790456cafa2edd24bd3fb20.jpg",
+        "detections": 8,
+        "duplicates": 2,
+        "classes": {
+          "Metal": 5,
+          "Plastic": 2,
+          "Paper": 1
+        },
+        "time_ms": 16,
+        "vram_mb": 305.3
+      },
+      {
+        "image": "2a6fbd4b0b2149c7b85c016e7e1608ab.jpg",
+        "detections": 6,
+        "duplicates": 0,
+        "classes": {
+          "Paper": 6
+        },
+        "time_ms": 16,
+        "vram_mb": 306.1
+      }
+    ]
+  }
+}

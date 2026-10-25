@@ -176,10 +176,10 @@ export default function HistoryDetailPage() {
           </div>
         </div>
         <div className="glass rounded-xl p-4 flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground flex items-center gap-1"><Scan className="size-3" /> Waste Coverage</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1"><Scan className="size-3" /> Detected Waste Index (Indicative)</span>
           <div className="flex items-baseline gap-1.5">
             <span className="text-lg font-bold text-foreground">{coveragePercent}%</span>
-            <span className="text-xs text-muted-foreground">surface area</span>
+            <span className="text-xs text-muted-foreground">detected index</span>
           </div>
         </div>
       </div>

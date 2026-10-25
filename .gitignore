@@ -64,13 +64,18 @@ venv.bak/
 *.pb
 *.tflite
 *.weights
-/models/
+/models/*
+!/models/external/
+!models/external/biaeye-yolo11s/best.pt
 !Backend/app/infrastructure/database/models/
 datasets/
 data/
 runs/
 wandb/
-results/
+# Results at repo root
+/results/
+WasteSense-Model-Lab/results/*
+!WasteSense-Model-Lab/results/final_handoff/
 
 # OS generated files
 .DS_Store
@@ -90,6 +95,8 @@ Thumbs.db
 *.pem
 
 *.pt
+!models/external/biaeye-yolo11s/best.pt
+!Backend/best_22cls_original.pt
 old_models/
 
 # WasteSense-Model-Lab: keep scripts and reports, exclude heavy artefacts

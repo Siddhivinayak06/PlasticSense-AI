@@ -1,0 +1,12 @@
+model,checkpoint,imgsz,task,classes,parameters,images,total_detections,images_with_detection,mean_sec_per_image,median_sec_per_image,peak_vram_mb,mean_mask_coverage_percent,is_native_resolution
+github_best_22cls,/home/bipin/Documents/PlasticSense-AI/WasteSense-Model-Lab/models/github/best.pt,640,detect,22,3015138,31,54,31,0.0311,0.0229,34.5,,True
+github_best_22cls,/home/bipin/Documents/PlasticSense-AI/WasteSense-Model-Lab/models/github/best.pt,960,detect,22,3015138,31,103,31,0.0266,0.0201,63.0,,False
+plasticsense_detector,/home/bipin/Documents/PlasticSense-AI/WasteSense-Model-Lab/models/github/plasticsense_detector_best.pt,640,detect,10,9431662,31,2,2,0.0258,0.018,133.8,,False
+plasticsense_detector,/home/bipin/Documents/PlasticSense-AI/WasteSense-Model-Lab/models/github/plasticsense_detector_best.pt,960,detect,10,9431662,31,5,3,0.0296,0.0215,188.1,,True
+taco_segmentation,/home/bipin/Documents/PlasticSense-AI/WasteSense-Model-Lab/models/github/taco_segmentation_best.pt,640,segment,5,10084223,31,328,31,0.0483,0.0212,138.2,6.675,False
+taco_segmentation,/home/bipin/Documents/PlasticSense-AI/WasteSense-Model-Lab/models/github/taco_segmentation_best.pt,960,segment,5,10084223,31,283,31,0.0602,0.0265,245.3,6.851,True
+hf_yolov8m_seg,/home/bipin/Documents/PlasticSense-AI/WasteSense-Model-Lab/models/huggingface/yolov8m-seg.pt,416,segment,5,27242543,31,78,27,0.0345,0.0206,204.5,5.386,True
+hf_yolov8m_seg,/home/bipin/Documents/PlasticSense-AI/WasteSense-Model-Lab/models/huggingface/yolov8m-seg.pt,640,segment,5,27242543,31,128,28,0.0437,0.025,241.8,4.344,False
+hf_yolov8m_seg,/home/bipin/Documents/PlasticSense-AI/WasteSense-Model-Lab/models/huggingface/yolov8m-seg.pt,960,segment,5,27242543,31,292,31,0.0739,0.0403,437.9,6.232,False
+biaeye_6cls,/home/bipin/Documents/PlasticSense-AI/ML-service/models/best.pt,640,detect,6,9430114,31,384,31,0.0251,0.0178,205.9,,True
+biaeye_6cls,/home/bipin/Documents/PlasticSense-AI/ML-service/models/best.pt,960,detect,6,9430114,31,687,31,0.0298,0.0222,262.7,,False

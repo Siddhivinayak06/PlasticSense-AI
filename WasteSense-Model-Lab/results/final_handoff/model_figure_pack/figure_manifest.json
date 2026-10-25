@@ -1,0 +1,40 @@
+{
+  "generated_at": "generated_by_script",
+  "source_policy": "Original-data-first; no dataset substitution or unauthorized training/evaluation was used.",
+  "artifacts": [
+    {
+      "repo_id": "raneemsadeh/biaeye-yolo11s",
+      "source_file": "results.png",
+      "output_file": "results\\model_figure_pack\\biaeye_training_curves.png",
+      "downloaded_from": "C:\\Users\\Lenovo\\.cache\\huggingface\\hub\\models--raneemsadeh--biaeye-yolo11s\\snapshots\\c9c4664a041072e78572330dfc770d2518ee2bba\\results.png"
+    },
+    {
+      "repo_id": "raneemsadeh/biaeye-yolo11s",
+      "source_file": "BoxPR_curve.png",
+      "output_file": "results\\model_figure_pack\\biaeye_box_pr_curve.png",
+      "downloaded_from": "C:\\Users\\Lenovo\\.cache\\huggingface\\hub\\models--raneemsadeh--biaeye-yolo11s\\snapshots\\c9c4664a041072e78572330dfc770d2518ee2bba\\BoxPR_curve.png"
+    },
+    {
+      "repo_id": "raneemsadeh/biaeye-yolo11s",
+      "source_file": "confusion_matrix_normalized.png",
+      "output_file": "results\\model_figure_pack\\biaeye_confusion_matrix_normalized.png",
+      "downloaded_from": "C:\\Users\\Lenovo\\.cache\\huggingface\\hub\\models--raneemsadeh--biaeye-yolo11s\\snapshots\\c9c4664a041072e78572330dfc770d2518ee2bba\\confusion_matrix_normalized.png"
+    },
+    {
+      "repo_id": "Vansh180/plastic-waste-classifier",
+      "source_file": "confusion_matrix.png",
+      "output_file": "results\\model_figure_pack\\plastic_confusion_matrix.png",
+      "downloaded_from": "C:\\Users\\Lenovo\\.cache\\huggingface\\hub\\models--Vansh180--plastic-waste-classifier\\snapshots\\aad01d33854d01a25b4a8c2f38041a6bfc5b38ee\\confusion_matrix.png"
+    }
+  ],
+  "local_summary_figures": [
+    "results\\model_figure_pack\\plastic_model_summary.png",
+    "results\\model_figure_pack\\biaeye_model_summary.png",
+    "results\\model_figure_pack\\fig_01_training_validation_curves.png",
+    "results\\model_figure_pack\\fig_02_precision_recall_curves.png",
+    "results\\model_figure_pack\\fig_03_confusion_matrices.png",
+    "results\\model_figure_pack\\fig_04_model_performance_comparison.png",
+    "results\\model_figure_pack\\fig_05_accuracy_vs_computational_cost.png",
+    "results\\model_figure_pack\\fig_06_qualitative_detection_results.png"
+  ]
+}

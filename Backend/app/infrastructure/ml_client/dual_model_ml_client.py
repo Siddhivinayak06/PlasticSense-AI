@@ -111,7 +111,7 @@ class DualModelMLClient(IMLClient):
                 cv2.rectangle(vis_img, (x1, y1), (x2, y2), box_color, 2)
 
                 # Label badge with white text on filled color header
-                label = f"{item.class_name} {item.confidence:.2f}"
+                label = f"{item.class_name} {int(item.confidence * 100)}% conf"
                 (w_label, h_label), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
                 badge_top = max(0, y1 - h_label - 6)
                 badge_bottom = max(h_label + 6, y1)

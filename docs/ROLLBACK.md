@@ -56,9 +56,23 @@ Downgrade targets:
 `latitude`/`longitude` would fail against rows that legitimately have no location.
 Restore from a snapshot instead if you truly need the old constraint.
 
-## 4. Reverting only the model swap
+## 4. Reverting the BiaEye model swap (2026-10-25)
 
-Edit `Backend/.env`:
+The production detector was upgraded from the 22-class YOLOv8n (`Backend/best.pt`) to BiaEye YOLO11s (`models/external/biaeye-yolo11s/best.pt`) because the 22-class model produced only 2-4 detections per image and mislabelled plastic as `scrap_paper`.
+
+Backup files created:
+- Model checkpoint: `Backend/best_22cls_original.pt`
+- Env file: `Backend/.env.backup.20261025`
+
+To revert to the 22-class YOLOv8n detector:
+
+```bash
+cd /home/bipin/Documents/PlasticSense-AI/Backend
+# Revert DETECTOR_MODEL_PATH in Backend/.env
+sed -i 's|DETECTOR_MODEL_PATH=.*|DETECTOR_MODEL_PATH="best_22cls_original.pt"|' .env
+```
+
+To revert to the older `plasticsense_detector_best.pt` baseline:
 
 ```ini
 DETECTOR_MODEL_PATH="../Ml-model/handoff_to_cachyos/models/plasticsense_detector_best.pt"

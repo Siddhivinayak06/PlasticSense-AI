@@ -11,6 +11,7 @@ from app.application.dto.detection_dto import (
 from app.application.interfaces.i_detection_repository import IDetectionRepository
 from app.application.interfaces.i_ml_client import IMLClient, MLClientError
 from app.application.services.feature_engine import FeatureEngine, StructuredVisualFeatures
+from app.application.services.authenticity_screening_service import AuthenticityScreeningService
 from app.application.services.geolocation_service import (
     extract_capture_time,
     extract_gps_from_image,
@@ -86,6 +87,7 @@ class DetectionService:
             settings.RESULTS_DIR, url_prefix="/media/results"
         )
         self.feature_engine = feature_engine or FeatureEngine()
+        self.authenticity_screener = AuthenticityScreeningService()
 
     def create_detection(self, dto: DetectionCreateDTO) -> DetectionResponseDTO:
         # ── 1. Validate the upload BEFORE doing any work or storing anything ──
@@ -157,6 +159,18 @@ class DetectionService:
         saved = self.repository.save(detection)
         features: Optional[StructuredVisualFeatures] = None
         assessment: Optional[RiskAssessment] = None
+        screening_res: Optional[Dict[str, Any]] = None
+
+        # Advisory authenticity screening (pixel-level FFT and gradient heuristics)
+        try:
+            import cv2
+            import numpy as np
+            nparr = np.frombuffer(dto.file_bytes, np.uint8)
+            decoded_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if decoded_img is not None:
+                screening_res = self.authenticity_screener.screen_image(decoded_img)
+        except Exception as e:
+            logger.warning("Authenticity screening failed: %s", e)
 
         try:
             # Run dual-model inference
@@ -191,7 +205,7 @@ class DetectionService:
             saved.failure_reason = str(error)
             saved = self.repository.update(saved)
 
-        return self._to_dto(saved, features=features, assessment=assessment)
+        return self._to_dto(saved, features=features, assessment=assessment, screening=screening_res)
 
     def get_detection(self, detection_id: str) -> Optional[DetectionResponseDTO]:
         detection = self.repository.get_by_id(detection_id)
@@ -229,6 +243,7 @@ class DetectionService:
         detection: Detection,
         features: Optional[StructuredVisualFeatures] = None,
         assessment: Optional[RiskAssessment] = None,
+        screening: Optional[Dict[str, Any]] = None,
     ) -> DetectionResponseDTO:
         items_dto = [
             DetectionItemDTO(
@@ -340,4 +355,5 @@ class DetectionService:
             segmentation=segmentation_data,
             features=features_data,
             risk=risk_data,
+            authenticity_screening=screening,
         )

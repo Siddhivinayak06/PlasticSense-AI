@@ -186,7 +186,9 @@ function DetectionResults({
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center justify-between p-3 rounded-xl bg-primary/10 border border-primary/20">
             <div>
-              <p className="text-[10px] text-muted-foreground uppercase font-semibold">Waste Coverage</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                Detected Waste Index <span className="font-normal lowercase tracking-normal text-muted-foreground/80">(indicative)</span>
+              </p>
               <p className="text-lg font-bold text-primary mt-0.5">{wasteCoverage}%</p>
             </div>
             <Layers className="size-5 text-primary opacity-80" />
@@ -199,6 +201,37 @@ function DetectionResults({
               </p>
             </div>
             <ShieldAlert className="size-5 text-primary opacity-80" />
+          </div>
+        </div>
+      )}
+
+      {/* Advisory Authenticity / AI-generation Screening Callout */}
+      {detection.authenticity_screening && detection.authenticity_screening.flag_level !== 'unspecified' && (
+        <div className={cn(
+          "flex items-start gap-2.5 p-3 rounded-xl border text-xs",
+          detection.authenticity_screening.ai_generation_suspected
+            ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
+            : "bg-muted/30 border-border/40 text-muted-foreground"
+        )}>
+          <Info className="size-4 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <div className="font-semibold flex items-center gap-1.5">
+              <span>Image Screening:</span>
+              <span className={cn(
+                "px-1.5 py-0.5 rounded font-mono text-[10px] uppercase",
+                detection.authenticity_screening.ai_generation_suspected
+                  ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold"
+                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              )}>
+                {detection.authenticity_screening.ai_generation_suspected ? 'Review Recommended' : 'Consistent with camera capture'}
+              </span>
+              <span className="font-mono text-[10px] opacity-70">
+                (suspicion: {detection.authenticity_screening.suspicion_score})
+              </span>
+            </div>
+            <p className="text-[11px] leading-relaxed opacity-85">
+              {detection.authenticity_screening.caveat}
+            </p>
           </div>
         </div>
       )}

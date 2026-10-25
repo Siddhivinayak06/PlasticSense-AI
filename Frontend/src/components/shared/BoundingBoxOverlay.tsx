@@ -30,7 +30,7 @@ const LABEL_PAD = 6;
 
 function formatLabel(className: string, confidence: number): string {
   const name = className.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  return `${name} ${Math.round(confidence * 100)}%`;
+  return `${name} · ${Math.round(confidence * 100)}% conf`;
 }
 
 interface ImageLayout {
@@ -180,38 +180,67 @@ export function BoundingBoxOverlay({
         not the container. This is key — with object-contain the image may be
         letterboxed, so the SVG must be offset and sized to the actual image area.
       */}
-      {isLoaded && layout && (
-        <svg
-          style={{
-            position:      'absolute',
-            left:          layout.offsetX,
-            top:           layout.offsetY,
-            width:         layout.renderedW,
-            height:        layout.renderedH,
-            overflow:      'visible',
-            zIndex:        10,
-            pointerEvents: 'auto',
-          }}
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {visibleItems.map((item) => {
-            if (!item.bbox_w || !item.bbox_h) return null;
+      {isLoaded && layout && (() => {
+        const occupiedBadges: { x1: number; y1: number; x2: number; y2: number }[] = [];
 
-            // Coordinates in natural image pixels → scale to rendered image pixels
-            const x = item.bbox_x * layout.scaleX;
-            const y = item.bbox_y * layout.scaleY;
-            const w = item.bbox_w * layout.scaleX;
-            const h = item.bbox_h * layout.scaleY;
+        return (
+          <svg
+            style={{
+              position:      'absolute',
+              left:          layout.offsetX,
+              top:           layout.offsetY,
+              width:         layout.renderedW,
+              height:        layout.renderedH,
+              overflow:      'visible',
+              zIndex:        10,
+              pointerEvents: 'auto',
+            }}
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {visibleItems.map((item) => {
+              if (!item.bbox_w || !item.bbox_h) return null;
 
-            const group   = item.waste_group.toLowerCase();
-            const colors  = CATEGORY_COLORS[group] ?? CATEGORY_COLORS.default;
-            const isHovered = hoveredItemId === item.id || hoveredItemId === item.class_name;
+              // Coordinates in natural image pixels → scale to rendered image pixels
+              const x = item.bbox_x * layout.scaleX;
+              const y = item.bbox_y * layout.scaleY;
+              const w = item.bbox_w * layout.scaleX;
+              const h = item.bbox_h * layout.scaleY;
 
-            const STROKE = isHovered ? 3 : 2;
-            const label  = formatLabel(item.class_name, item.confidence);
-            const labelW = label.length * CHAR_PX + LABEL_PAD * 2;
-            const badgeY = y >= LABEL_H ? y - LABEL_H : y;
-            const textY  = badgeY + LABEL_H - 6;
+              const group   = item.waste_group.toLowerCase();
+              const colors  = CATEGORY_COLORS[group] ?? CATEGORY_COLORS.default;
+              const isHovered = hoveredItemId === item.id || hoveredItemId === item.class_name;
+
+              const STROKE = isHovered ? 3 : 2;
+              const label  = formatLabel(item.class_name, item.confidence);
+              const labelW = label.length * CHAR_PX + LABEL_PAD * 2;
+
+              // Avoid overlapping badges: try above, inside top, below, inside bottom
+              const candY = [
+                y >= LABEL_H ? y - LABEL_H : y,
+                y + 2,
+                y + h + 2,
+                Math.max(0, y + h - LABEL_H - 2),
+              ];
+
+              let badgeY = candY[0];
+              for (const cy of candY) {
+                const collides = occupiedBadges.some(
+                  (occ) => !(x + labelW < occ.x1 || x > occ.x2 || cy + LABEL_H < occ.y1 || cy > occ.y2)
+                );
+                if (!collides) {
+                  badgeY = cy;
+                  break;
+                }
+              }
+
+              occupiedBadges.push({
+                x1: x,
+                y1: badgeY,
+                x2: x + labelW,
+                y2: badgeY + LABEL_H,
+              });
+
+              const textY  = badgeY + LABEL_H - 6;
 
             return (
               <g
@@ -264,7 +293,7 @@ export function BoundingBoxOverlay({
             );
           })}
         </svg>
-      )}
+      ); })()}
     </div>
   );
 }

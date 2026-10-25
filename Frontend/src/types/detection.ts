@@ -19,6 +19,15 @@ export interface SegmentationInfo {
   material_counts: Record<string, number>;
 }
 
+export interface AuthenticityScreening {
+  ai_generation_suspected: boolean;
+  suspicion_score: number;
+  flag_level: string;
+  indicators: string[];
+  caveat: string;
+  screening_time_ms: number;
+}
+
 export interface Detection {
   id: string;
   image_url: string;
@@ -39,6 +48,7 @@ export interface Detection {
   segmentation?: SegmentationInfo | null;
   features?: DetectionFeatures | null;
   risk?: DetectionRisk | null;
+  authenticity_screening?: AuthenticityScreening | null;
 }
 
 /** Scalar summary; per-material counts are added under each waste group name. */

@@ -114,6 +114,7 @@ def _to_detection_schema(dto) -> DetectionSchema:
         segmentation=dto.segmentation,
         features=dto.features,
         risk=dto.risk,
+        authenticity_screening=getattr(dto, "authenticity_screening", None),
     )
 
 
