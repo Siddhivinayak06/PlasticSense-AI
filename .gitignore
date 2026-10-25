@@ -88,6 +88,8 @@ Thumbs.db
 
 # Environment variables
 .env
+.env.*
+*.backup.*
 .env.local
 .env.development.local
 .env.test.local
@@ -110,3 +112,4 @@ WasteSense-Model-Lab/reports/**/*.png
 
 # Unexpanded duplicate of handoff_to_cachyos/models/
 Ml-model/handoff_to_cachyos/models.zip
+Ml-model/handoff_to_cachyos/results/
