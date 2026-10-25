@@ -109,24 +109,46 @@ export function RecentReportsTable() {
               </TableRow>
             ) : (
               data?.data.map((detection, index) => {
-                const objectCount = detection.items.length;
+                const objectCount = detection?.items?.length ?? 0;
+                const reportId = detection?.id || '';
+                const shortId = reportId ? reportId.slice(0, 8) : 'Unknown';
+                const hasGps =
+                  detection?.latitude != null &&
+                  detection?.longitude != null &&
+                  !isNaN(Number(detection.latitude)) &&
+                  !isNaN(Number(detection.longitude));
+                const coordinatesText = hasGps
+                  ? `${Number(detection.latitude).toFixed(3)}, ${Number(detection.longitude).toFixed(3)}`
+                  : 'Unknown GPS';
+
+                let timeAgo = 'Recently';
+                if (detection?.created_at) {
+                  try {
+                    const parsed = new Date(detection.created_at);
+                    if (!isNaN(parsed.getTime())) {
+                      timeAgo = formatDistanceToNow(parsed, { addSuffix: true });
+                    }
+                  } catch {
+                    timeAgo = 'Recently';
+                  }
+                }
 
                 return (
                   <motion.tr
-                    key={detection.id}
+                    key={reportId || index}
                     variants={tableRowVariants}
                     initial="hidden"
                     animate="visible"
                     transition={{ delay: index * 0.04 }}
-                    onClick={() => router.push(`/history/${detection.id}`)}
+                    onClick={() => reportId && router.push(`/history/${reportId}`)}
                     className="group cursor-pointer hover:bg-muted/40 dark:hover:bg-slate-800/40 border-b border-border/30 transition-colors"
                   >
                     <TableCell className="font-mono text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
-                      #{detection.id.slice(0, 8)}
+                      #{shortId}
                     </TableCell>
                     <TableCell>
                       <div className="flex size-9 items-center justify-center rounded-xl bg-muted/60 dark:bg-slate-800 overflow-hidden border border-border/50 shadow-2xs">
-                        {detection.annotated_image_url ? (
+                        {detection?.annotated_image_url ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src={resolveImageUrl(detection.annotated_image_url)}
@@ -145,7 +167,7 @@ export function RecentReportsTable() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1.5 flex-wrap">
-                        {detection.summary &&
+                        {detection?.summary &&
                           Object.entries(detection.summary)
                             .filter(
                               ([k, v]) =>
@@ -174,35 +196,31 @@ export function RecentReportsTable() {
                     <TableCell className="hidden md:table-cell">
                       <div className="flex items-center text-xs text-muted-foreground gap-1">
                         <MapPin className="size-3 text-muted-foreground/70 shrink-0" />
-                        <span className="truncate">
-                          {detection.latitude !== null && detection.longitude !== null
-                            ? `${detection.latitude.toFixed(3)}, ${detection.longitude.toFixed(3)}`
-                            : 'Unknown GPS'}
-                        </span>
+                        <span className="truncate">{coordinatesText}</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <span
                         className={cn(
                           'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border capitalize',
-                          statusConfig[detection.detection_status] || statusConfig.pending
+                          statusConfig[detection?.detection_status || ''] || statusConfig.pending
                         )}
                       >
-                        {detection.detection_status}
+                        {detection?.detection_status || 'pending'}
                       </span>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(detection.created_at), { addSuffix: true })}
+                      {timeAgo}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="icon-sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10 hover:text-primary rounded-lg"
-                        aria-label={`View report ${detection.id}`}
+                        aria-label={`View report ${reportId}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/history/${detection.id}`);
+                          if (reportId) router.push(`/history/${reportId}`);
                         }}
                       >
                         <Eye className="size-3.5" />

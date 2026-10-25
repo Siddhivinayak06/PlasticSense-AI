@@ -13,15 +13,63 @@ function AuthCallbackContent() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
     async function handleAuth() {
       try {
-        // Retrieve current session from URL hash or code exchange
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        // 1. Check if Supabase returned an error in the query parameters
+        const error = searchParams.get('error');
+        const errorCode = searchParams.get('error_code');
+        const errorDescription = searchParams.get('error_description');
 
-        const session = data?.session;
-        if (session?.user) {
-          // Sync with backend database to guarantee user profile & role persistence
+        if (error || errorCode || errorDescription) {
+          const formattedMsg =
+            errorDescription?.replace(/\+/g, ' ') ||
+            errorCode ||
+            error ||
+            'OAuth sign-in was rejected by authentication provider.';
+          throw new Error(formattedMsg);
+        }
+
+        // 2. Also check URL hash for error fragments (e.g., #error=...)
+        if (typeof window !== 'undefined' && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const hashError = hashParams.get('error');
+          const hashErrorDesc = hashParams.get('error_description');
+          if (hashError || hashErrorDesc) {
+            throw new Error(
+              hashErrorDesc?.replace(/\+/g, ' ') || hashError || 'Authentication failed'
+            );
+          }
+        }
+
+        // 3. Check for PKCE exchange code
+        const code = searchParams.get('code');
+        let session = null;
+
+        if (code) {
+          const { data, error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeErr) {
+            console.error('Code exchange error:', exchangeErr);
+            throw exchangeErr;
+          }
+          session = data?.session;
+        }
+
+        // 4. If no code or already exchanged, retrieve current session
+        if (!session) {
+          const { data, error: sessionErr } = await supabase.auth.getSession();
+          if (sessionErr) throw sessionErr;
+          session = data?.session;
+        }
+
+        // 5. If session is ready, establish cookies and sync profile
+        if (session?.user && isMounted) {
+          if (typeof document !== 'undefined' && session.access_token) {
+            document.cookie = `wastesense_auth_session=${session.access_token}; path=/; max-age=604800; SameSite=Lax`;
+          }
+
           try {
             const meta = session.user.user_metadata || {};
             await api.post('/auth/sync', {
@@ -38,10 +86,13 @@ function AuthCallbackContent() {
           return;
         }
 
-        // If session not ready immediately, wait briefly for Supabase event listener
+        // 6. Listen for auth state change if session is still settling
         const { data: authListener } = supabase.auth.onAuthStateChange(
           async (event, newSession) => {
-            if (newSession?.user) {
+            if (newSession?.user && isMounted) {
+              if (typeof document !== 'undefined' && newSession.access_token) {
+                document.cookie = `wastesense_auth_session=${newSession.access_token}; path=/; max-age=604800; SameSite=Lax`;
+              }
               try {
                 const meta = newSession.user.user_metadata || {};
                 await api.post('/auth/sync', {
@@ -58,14 +109,30 @@ function AuthCallbackContent() {
             }
           }
         );
+
+        // 7. Safety timeout: if after 6 seconds no session resolved, notify user
+        timeoutId = setTimeout(() => {
+          if (isMounted) {
+            setErrorMsg(
+              'Authentication timed out. Your session could not be established. Please try signing in again.'
+            );
+          }
+        }, 6000);
       } catch (err: unknown) {
         console.error('OAuth callback error:', err);
-        setErrorMsg(err instanceof Error ? err.message : 'Authentication handshake failed');
+        if (isMounted) {
+          setErrorMsg(err instanceof Error ? err.message : 'Authentication handshake failed');
+        }
       }
     }
 
     handleAuth();
-  }, [returnTo, router]);
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [returnTo, router, searchParams]);
 
   if (errorMsg) {
     return (

@@ -10,6 +10,7 @@ class DetectionCreateDTO:
     filename: str
     content_type: str
     file_bytes: bytes
+    user_id: Optional[str] = None
 
 
 @dataclass
@@ -46,3 +47,4 @@ class DetectionResponseDTO:
     # EXIF capture time (ISO-8601), distinct from created_at = upload time.
     captured_at: Optional[str] = None
     authenticity_screening: Optional[dict] = None
+    user_id: Optional[str] = None

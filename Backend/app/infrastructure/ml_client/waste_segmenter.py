@@ -2,7 +2,8 @@
 
 import logging
 import time
-from typing import Dict, Optional
+import uuid
+from typing import Dict, List, Optional
 
 import cv2
 import numpy as np
@@ -15,6 +16,7 @@ from app.application.interfaces.i_waste_segmenter import (
     SegmenterPrediction,
 )
 from app.core.config import resolve_inference_device, resolve_model_path, settings
+from app.domain.entities.detection import DetectionItem
 from app.infrastructure.ml_client.model_introspect import describe
 
 logger = logging.getLogger("WasteSense_AI")
@@ -108,14 +110,16 @@ class WasteSegmenter(IWasteSegmenter):
             # Overlay canvas for visualization
             overlay = image.copy()
 
+            items: List[DetectionItem] = []
             if len(results) > 0 and results[0].masks is not None:
                 r = results[0]
                 masks_data = r.masks.data.cpu().numpy()
                 classes_data = r.boxes.cls.cpu().numpy().astype(int)
                 confs_data = r.boxes.conf.cpu().numpy()
+                boxes_data = r.boxes.xyxy.cpu().numpy() if r.boxes is not None else None
                 total_masks = len(masks_data)
 
-                for mask, cls_id, conf in zip(masks_data, classes_data, confs_data):
+                for idx, (mask, cls_id, conf) in enumerate(zip(masks_data, classes_data, confs_data)):
                     raw_cls_name = self.class_names.get(cls_id, f"class_{cls_id}")
                     # Standardize material name: e.g. "Plastic", "Metal", "Glass", "Paper", "Other"
                     material_name = raw_cls_name.capitalize()
@@ -140,6 +144,26 @@ class WasteSegmenter(IWasteSegmenter):
                     # Find contours to draw crisp outlines
                     contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     cv2.drawContours(image, contours, -1, color, 2)
+
+                    # Create DetectionItem for discrete segmentation objects
+                    if boxes_data is not None and idx < len(boxes_data):
+                        bx1, by1, bx2, by2 = boxes_data[idx]
+                        bw = float(max(0.0, bx2 - bx1))
+                        bh = float(max(0.0, by2 - by1))
+                        if bw >= 6 and bh >= 6:
+                            items.append(
+                                DetectionItem(
+                                    id=str(uuid.uuid4()),
+                                    class_name=material_name,
+                                    waste_group=material_name.lower(),
+                                    confidence=float(conf),
+                                    bbox_x=float(bx1),
+                                    bbox_y=float(by1),
+                                    bbox_w=bw,
+                                    bbox_h=bh,
+                                    waste_type="unknown",
+                                )
+                            )
 
             # Calculate total union waste pixels and percentage
             waste_pixels = int(combined_mask.sum())
@@ -167,6 +191,7 @@ class WasteSegmenter(IWasteSegmenter):
                 annotated_image_bytes=annotated_image_bytes,
                 processing_time_ms=proc_time_ms,
                 combined_mask=combined_mask,
+                items=items,
             )
         except Exception as e:
             logger.error(f"Segmenter inference error: {e}", exc_info=True)

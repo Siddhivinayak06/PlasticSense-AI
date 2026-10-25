@@ -74,10 +74,12 @@ class Detection:
         items: Optional[List[DetectionItem]] = None,
         risk_assessment: Optional[Any] = None,
         created_at: Optional[datetime] = None,
+        user_id: Optional[str] = None,
         *args,
         **kwargs,
     ):
         self.id = id
+        self.user_id = user_id or kwargs.get("user_id")
 
         # Handle legacy positional args: Detection(id, location, image_url, ...)
         if isinstance(image_url, Location):

@@ -6,7 +6,6 @@ import { SEVERITY_COLORS } from './StaticMiniMap';
 import { MapContainer, TileLayer, Marker, useMap, Circle } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 
 import type { Report } from '@/types/report';

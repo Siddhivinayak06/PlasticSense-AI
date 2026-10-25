@@ -3,14 +3,11 @@ import { getAccessToken } from './supabase';
 
 export function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) {
-    let url = process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
-    if (url.endsWith('/api/v1')) {
-      url = url.substring(0, url.length - 7);
+    let url = process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '').replace(/\/api\/v1$/, '');
+    if (url.includes('://localhost')) {
+      url = url.replace('://localhost', '://127.0.0.1');
     }
     return url;
-  }
-  if (typeof window !== 'undefined' && window.location?.hostname) {
-    return `http://${window.location.hostname}:8000`;
   }
   return 'http://127.0.0.1:8000';
 }
@@ -38,7 +35,8 @@ export function resolveImageUrl(imagePath: string | null | undefined): string {
     return imagePath;
   }
   const path = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
-  return `${getBaseUrl()}${path}`;
+  const base = getBaseUrl() || (typeof window !== 'undefined' ? '' : 'http://127.0.0.1:8000');
+  return `${base}${path}`;
 }
 
 /** Human-readable message from an API error (FastAPI `detail`), never a stack trace. */

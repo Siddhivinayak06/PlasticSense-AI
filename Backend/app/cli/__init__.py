@@ -1,0 +1,1 @@
+"""WasteSense Admin CLI module."""

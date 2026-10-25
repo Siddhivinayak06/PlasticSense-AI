@@ -20,24 +20,17 @@ const PROTECTED_PREFIXES = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Find any supabase auth token cookie
+  // Find any verified supabase auth token cookie (ignoring PKCE code-verifiers)
   const cookies = request.cookies.getAll();
   const hasAuthCookie = cookies.some(
     (c) =>
-      c.name.startsWith('sb-') ||
-      c.name.includes('auth-token') ||
-      c.name === 'wastesense_auth_session'
+      c.name === 'wastesense_auth_session' ||
+      (c.name.includes('-auth-token') && !c.name.includes('code-verifier'))
   );
 
   const isProtected = PROTECTED_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix)
   );
-
-  // If visiting login while already possessing an auth session, send to dashboard
-  if (pathname === '/login' && hasAuthCookie) {
-    const returnTo = request.nextUrl.searchParams.get('returnTo') || '/dashboard';
-    return NextResponse.redirect(new URL(returnTo, request.url));
-  }
 
   // If visiting protected route without auth cookie, redirect to login
   if (isProtected && !hasAuthCookie) {
@@ -57,8 +50,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico, images, sitemap, robots
-     * - api routes
+     * - api routes and media streaming routes (handled directly by Next.js rewrites)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api(?:/|$)|media(?:/|$)|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

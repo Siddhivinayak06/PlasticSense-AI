@@ -26,11 +26,11 @@ const COLORS: Record<string, string> = {
 
 export function WasteDistributionChart({ breakdown }: WasteDistributionChartProps) {
   // Format data for Recharts
-  const data = Object.entries(breakdown)
+  const data = Object.entries(breakdown || {})
     .filter(([k]) => k !== 'total_objects' && k !== 'total')
     .map(([key, value]) => ({
       name: key.charAt(0).toUpperCase() + key.slice(1),
-      value,
+      value: typeof value === 'number' ? value : 0,
       fill: COLORS[key.toLowerCase()] || COLORS.other,
     }))
     .filter((item) => item.value > 0);

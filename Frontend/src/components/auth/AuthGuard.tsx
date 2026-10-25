@@ -44,6 +44,11 @@ export function AuthGuard({ children, adminOnly = false }: AuthGuardProps) {
         <p className="text-sm font-medium text-muted-foreground">
           Redirecting to Google Sign-In...
         </p>
+        <Link href={`/login?returnTo=${encodeURIComponent(pathname)}`}>
+          <Button variant="outline" size="sm" className="rounded-xl text-xs">
+            Click here if not redirected
+          </Button>
+        </Link>
       </div>
     );
   }

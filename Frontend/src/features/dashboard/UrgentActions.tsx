@@ -40,14 +40,16 @@ export function UrgentActions() {
       .map((h) => ({
         id: h.id,
         name: h.name,
-        city: `${h.latitude.toFixed(4)}, ${h.longitude.toFixed(4)}`,
-        severityScore: Math.round(h.max_risk_score as number),
+        city: (h.latitude != null && h.longitude != null && !isNaN(Number(h.latitude)))
+          ? `${Number(h.latitude).toFixed(4)}, ${Number(h.longitude).toFixed(4)}`
+          : 'Unknown Location',
+        severityScore: Math.round(Number(h.max_risk_score ?? 0)),
         severity: h.severity as UrgentHotspot['severity'],
-        wasteCount: h.total_waste_objects,
-        dominantWaste: h.most_common_material,
+        wasteCount: h.total_waste_objects ?? 0,
+        dominantWaste: h.most_common_material || 'Mixed Waste',
         lastDetected: h.last_updated,
-        reportCount: h.report_count,
-        cleanupStatus: h.status.replace('_', ' '),
+        reportCount: h.report_count ?? 1,
+        cleanupStatus: (h.status || 'pending').replace('_', ' '),
         assignedTeam: h.assigned_team ?? undefined,
       }))
       .sort((a, b) => b.severityScore - a.severityScore)

@@ -23,6 +23,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/providers/AuthProvider";
 
 /* ─── Animated counter ─── */
@@ -71,7 +72,7 @@ export default function LandingPage() {
 
   const { resolvedTheme } = useTheme();
   const mounted = useMounted();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, signOut } = useAuth();
   const launchHref = isAuthenticated ? "/dashboard" : "/login?returnTo=/dashboard";
 
   const isLightMode = mounted ? resolvedTheme === "light" : false;
@@ -114,20 +115,36 @@ export default function LandingPage() {
               Impact
             </a>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
-            <Link
-              href={launchHref}
-              className="flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-slate-950 px-5 py-2.5 text-sm font-semibold transition-all hover:shadow-[0_0_20px_-5px_rgba(16,185,129,0.5)] active:scale-95"
-            >
-              <span className="hidden sm:inline">
-                {isAuthenticated ? "Open Dashboard" : "Launch WasteSense"}
-              </span>
-              <span className="inline sm:hidden">
-                {isAuthenticated ? "Dashboard" : "Launch"}
-              </span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={signOut}
+                  className="rounded-xl text-xs font-semibold text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 px-3 h-9"
+                >
+                  Sign Out
+                </Button>
+                <Link
+                  href="/dashboard"
+                  className="flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-slate-950 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-all hover:shadow-[0_0_20px_-5px_rgba(16,185,129,0.5)] active:scale-95"
+                >
+                  <span>Open Dashboard</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            ) : (
+              <Link
+                href="/login?returnTo=/dashboard"
+                className="flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-slate-950 px-5 py-2.5 text-sm font-semibold transition-all hover:shadow-[0_0_20px_-5px_rgba(16,185,129,0.5)] active:scale-95"
+              >
+                <span className="hidden sm:inline">Launch WasteSense</span>
+                <span className="inline sm:hidden">Launch</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
           </div>
         </motion.div>
       </nav>
@@ -150,7 +167,7 @@ export default function LandingPage() {
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-8 pt-32 pb-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Left – Copy */}
-          <motion.div style={{ opacity: heroOpacity }}>
+          <motion.div style={{ opacity: mounted ? heroOpacity : 1 }}>
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -236,27 +253,29 @@ export default function LandingPage() {
             className="relative h-[500px] lg:h-[650px] xl:h-[700px] w-full cursor-grab active:cursor-grabbing flex items-center justify-center lg:justify-end"
           >
             <div className="relative w-full max-w-[800px] aspect-square">
-              <Canvas
-                camera={{ position: [-0.5, 0, 5.5], fov: 45 }}
-                dpr={[1, 2]}
-                gl={{
-                  antialias: true,
-                  toneMapping: 3,
-                  toneMappingExposure: isLightMode ? 1.6 : 1.25,
-                }}
-                className="w-full h-full"
-              >
-                <Suspense fallback={null}>
-                  <InteractiveGlobe isLightMode={isLightMode} />
-                  <OrbitControls
-                    enableZoom={false}
-                    enablePan={false}
-                    autoRotate={false}
-                    minPolarAngle={Math.PI / 3}
-                    maxPolarAngle={(2 * Math.PI) / 3}
-                  />
-                </Suspense>
-              </Canvas>
+              {mounted ? (
+                <Canvas
+                  camera={{ position: [-0.5, 0, 5.5], fov: 45 }}
+                  dpr={[1, 2]}
+                  gl={{
+                    antialias: true,
+                    toneMapping: 3,
+                    toneMappingExposure: isLightMode ? 1.6 : 1.25,
+                  }}
+                  className="w-full h-full"
+                >
+                  <Suspense fallback={null}>
+                    <InteractiveGlobe isLightMode={isLightMode} />
+                    <OrbitControls
+                      enableZoom={false}
+                      enablePan={false}
+                      autoRotate={false}
+                      minPolarAngle={Math.PI / 3}
+                      maxPolarAngle={(2 * Math.PI) / 3}
+                    />
+                  </Suspense>
+                </Canvas>
+              ) : null}
               {/* Soft subtle vignette */}
               <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_72%,#ffffff_100%)] dark:bg-[radial-gradient(circle_at_center,rgba(2,6,23,0)_72%,#020617_100%)] transition-colors duration-500" />
             </div>

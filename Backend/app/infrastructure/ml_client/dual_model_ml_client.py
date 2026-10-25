@@ -47,7 +47,65 @@ class DualModelMLClient(IMLClient):
 
             total_processing_ms = int((time.time() - start_time) * 1000)
 
-            # 4. Generate combined visualization (segmentation masks + fine-grained bounding boxes)
+            # 4. Cross-model fusion: Incorporate complementary detections from TACO segmenter
+            # Any valid waste object detected by TACO that was missed by YOLO (IoU < 0.35)
+            # is merged so scene-level bulky/diffuse waste items (e.g. sacks, nets, tarps) are not lost.
+            final_items = list(det_res.items)
+            if seg_res.items:
+                h_img, w_img = img.shape[:2]
+                complementary_crops = []
+                complementary_indices = []
+
+                for s_item in seg_res.items:
+                    s_x1, s_y1 = s_item.bbox_x, s_item.bbox_y
+                    s_x2, s_y2 = s_item.bbox_x + s_item.bbox_w, s_item.bbox_y + s_item.bbox_h
+                    s_area = s_item.bbox_w * s_item.bbox_h
+                    if s_area <= 0:
+                        continue
+
+                    max_iou = 0.0
+                    for d_item in det_res.items:
+                        d_x1, d_y1 = d_item.bbox_x, d_item.bbox_y
+                        d_x2, d_y2 = d_item.bbox_x + d_item.bbox_w, d_item.bbox_y + d_item.bbox_h
+                        ix1, iy1 = max(s_x1, d_x1), max(s_y1, d_y1)
+                        ix2, iy2 = min(s_x2, d_x2), min(s_y2, d_y2)
+                        inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+                        if inter > 0:
+                            d_area = d_item.bbox_w * d_item.bbox_h
+                            union = s_area + d_area - inter
+                            iou = inter / union if union > 0 else 0.0
+                            if iou > max_iou:
+                                max_iou = iou
+
+                    if max_iou < 0.35 and s_item.confidence >= 0.15:
+                        final_items.append(s_item)
+                        cx1 = max(0, int(s_x1))
+                        cy1 = max(0, int(s_y1))
+                        cx2 = min(w_img, int(s_x2))
+                        cy2 = min(h_img, int(s_y2))
+                        if (cx2 - cx1) >= 8 and (cy2 - cy1) >= 8:
+                            complementary_crops.append(img[cy1:cy2, cx1:cx2])
+                            complementary_indices.append(len(final_items) - 1)
+
+                if complementary_crops and hasattr(self.detector, "plastic_classifier") and self.detector.plastic_classifier:
+                    try:
+                        c_preds = self.detector.plastic_classifier.classify_crops_batch(complementary_crops, batch_size=16)
+                        for c_idx, (resin_cls, resin_conf) in zip(complementary_indices, c_preds):
+                            c_item = final_items[c_idx]
+                            if resin_conf >= 0.30 and resin_cls != "unknown":
+                                c_item.waste_group = "plastic"
+                                c_item.waste_type = resin_cls
+                                if hasattr(self.detector, "_map_plastic_item_form"):
+                                    c_item.class_name = self.detector._map_plastic_item_form(resin_cls, c_item.bbox_w, c_item.bbox_h)
+                                c_item.confidence = round(max(c_item.confidence, resin_conf), 4)
+                    except Exception as e:
+                        logger.warning(f"Classification of complementary items failed: {e}")
+
+            # Update det_res with merged items
+            det_res.items = final_items
+            det_res.total_objects = len(final_items)
+
+            # 5. Generate combined visualization (segmentation masks + fine-grained bounding boxes)
             combined_annotated_bytes = self._create_combined_visualization(img, det_res, seg_res)
 
             # Use combined visualization if available; fallback to detector or segmenter
@@ -61,7 +119,7 @@ class DualModelMLClient(IMLClient):
 
             return MLPrediction(
                 model_version=model_version,
-                items=det_res.items,
+                items=final_items,
                 annotated_image_bytes=primary_annotated_bytes,
                 processing_time_ms=total_processing_ms,
                 segmentation=seg_res,

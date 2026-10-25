@@ -18,6 +18,8 @@ from app.application.services.detection_service import DetectionService, ModelUn
 from app.core.config import settings
 from app.core.cache import cache_clear, cache_get, cache_set
 from app.core.logging import logger
+from app.core.auth import get_current_user_optional, get_current_user, verify_report_ownership, require_admin
+from app.infrastructure.database.models.user_profile_model import UserProfileModel
 
 router = APIRouter(prefix="/detections", tags=["Detections"])
 
@@ -115,6 +117,7 @@ def _to_detection_schema(dto) -> DetectionSchema:
         features=dto.features,
         risk=dto.risk,
         authenticity_screening=getattr(dto, "authenticity_screening", None),
+        user_id=getattr(dto, "user_id", None),
     )
 
 
@@ -136,6 +139,7 @@ async def create_detection(
     image: Optional[UploadFile] = File(None, description="Waste image file (JPG, PNG, WEBP, BMP)"),
     file: Optional[UploadFile] = File(None, description="Waste image file (alias)"),
     service: DetectionService = Depends(get_detection_service),
+    current_user: Optional[UserProfileModel] = Depends(get_current_user_optional),
     _limited: None = Depends(inference_rate_limit),
 ):
     upload_file = image or file
@@ -146,12 +150,13 @@ async def create_detection(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Provide both latitude and longitude, or neither",
         )
-    result = await run_detection(service, upload_file, latitude, longitude)
+    user_id = current_user.id if current_user else None
+    result = await run_detection(service, upload_file, latitude, longitude, user_id=user_id)
     cache_clear()
     return _to_detection_schema(result)
 
 
-async def run_detection(service: DetectionService, upload_file: UploadFile, latitude, longitude):
+async def run_detection(service: DetectionService, upload_file: UploadFile, latitude, longitude, user_id: Optional[str] = None):
     """Validate, analyse and persist one upload, mapping failures to safe HTTP errors.
 
     Client errors (bad file, bad coordinates) return their validation message.
@@ -165,6 +170,7 @@ async def run_detection(service: DetectionService, upload_file: UploadFile, lati
         filename=upload_file.filename or "uploaded_image.jpg",
         content_type=upload_file.content_type or "",
         file_bytes=file_bytes,
+        user_id=user_id,
     )
     try:
         return service.create_detection(dto)
@@ -193,6 +199,7 @@ async def create_batch_detection(
     longitude: Optional[float] = Form(None, ge=-180, le=180, description="Longitude coordinate"),
     files: list[UploadFile] = File(..., description="List of images"),
     service: DetectionService = Depends(get_detection_service),
+    current_user: Optional[UserProfileModel] = Depends(get_current_user_optional),
     _limited: None = Depends(inference_rate_limit),
 ):
     if len(files) > settings.MAX_BATCH_FILES:
@@ -202,10 +209,11 @@ async def create_batch_detection(
         )
     charge_rate_limit(request, len(files) - 1)
     results = []
+    user_id = current_user.id if current_user else None
     for upload_file in files:
         try:
             results.append(_to_detection_schema(
-                await run_detection(service, upload_file, latitude, longitude)
+                await run_detection(service, upload_file, latitude, longitude, user_id=user_id)
             ))
         except HTTPException as e:
             if e.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
@@ -225,9 +233,20 @@ async def create_batch_detection(
 def list_detections(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
+    my_only: bool = Query(False, description="Filter only reports submitted by the current authenticated user"),
     service: DetectionService = Depends(get_detection_service),
+    current_user: Optional[UserProfileModel] = Depends(get_current_user_optional),
 ):
-    items, total = service.list_detections(page=page, limit=limit)
+    user_id_filter = None
+    if my_only:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required to view your submitted reports.",
+            )
+        user_id_filter = current_user.id
+
+    items, total = service.list_detections(page=page, limit=limit, user_id=user_id_filter)
     total_pages = math.ceil(total / limit) if limit > 0 else 1
     meta = PaginationMeta(
         page=page,
@@ -489,10 +508,46 @@ def compute_hotspots(service: DetectionService, db: Session) -> "HotspotsEnvelop
 def get_detection(
     detection_id: str,
     service: DetectionService = Depends(get_detection_service),
+    current_user: Optional[UserProfileModel] = Depends(get_current_user_optional),
 ):
     item = service.get_detection(detection_id)
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Detection '{detection_id}' not found")
+
+    # IDOR protection: if the report has an owner, verify caller is owner or admin
+    if getattr(item, "user_id", None):
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required to view this private report.",
+            )
+        verify_report_ownership(item.user_id, current_user)
+
     schema_data = _to_detection_schema(item)
     return SingleDetectionEnvelope(data=schema_data, meta=None, error=None)
+
+
+@router.delete(
+    "/{detection_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete a detection report (Owner or Admin only)",
+)
+def delete_detection(
+    detection_id: str,
+    service: DetectionService = Depends(get_detection_service),
+    current_user: UserProfileModel = Depends(get_current_user),
+):
+    item = service.get_detection(detection_id)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Detection '{detection_id}' not found")
+
+    verify_report_ownership(item.user_id, current_user)
+    deleted = service.delete_detection(detection_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete detection",
+        )
+    cache_clear()
+    return {"status": "success", "message": f"Detection '{detection_id}' deleted successfully."}
 

@@ -26,7 +26,6 @@ export async function submitDetection(
 ): Promise<Detection> {
   const form = new FormData();
   form.append('image', file);
-  form.append('file', file);
   if (latitude !== null) form.append('latitude', String(latitude));
   if (longitude !== null) form.append('longitude', String(longitude));
 

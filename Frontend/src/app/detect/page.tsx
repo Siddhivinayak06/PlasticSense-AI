@@ -27,7 +27,7 @@ import { ImageComparison } from '@/components/shared/ImageComparison';
 
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'];
-const MAX_UPLOAD_MB = 10;
+const MAX_UPLOAD_MB = 25;
 import { CleanupRecommendation } from '@/features/dashboard/CleanupRecommendation';
 
 // ─── Helpers ────────────────────────────────────────────────────

@@ -54,6 +54,7 @@ class DetectionRepository(IDetectionRepository):
             items=items,
             risk_assessment=assessment,
             created_at=model.created_at,
+            user_id=model.user_id,
         )
 
 
@@ -72,6 +73,7 @@ class DetectionRepository(IDetectionRepository):
             detection_status=detection.detection_status,
             failure_reason=detection.failure_reason,
             created_at=detection.created_at,
+            user_id=getattr(detection, 'user_id', None),
         )
 
         for item in detection.items:
@@ -146,21 +148,31 @@ class DetectionRepository(IDetectionRepository):
             return None
         return self._to_domain(model)
 
-    def get_all(self, skip: int = 0, limit: int = 10) -> Tuple[List[Detection], int]:
-        total = self.db.query(func.count(DetectionModel.id)).scalar() or 0
+    def get_all(self, skip: int = 0, limit: int = 10, user_id: Optional[str] = None) -> Tuple[List[Detection], int]:
+        query = self.db.query(DetectionModel).options(
+            selectinload(DetectionModel.items),
+            selectinload(DetectionModel.risk_assessment),
+        )
+        if user_id:
+            query = query.filter(DetectionModel.user_id == user_id)
+
+        total = query.count()
         models = (
-            self.db.query(DetectionModel)
-            .options(
-                selectinload(DetectionModel.items),
-                selectinload(DetectionModel.risk_assessment),
-            )
-            .order_by(DetectionModel.created_at.desc())
+            query.order_by(DetectionModel.created_at.desc())
             .offset(skip)
             .limit(limit)
             .all()
         )
         items = [self._to_domain(m) for m in models]
         return items, total
+
+    def delete(self, detection_id: str) -> bool:
+        model = self.db.query(DetectionModel).filter(DetectionModel.id == detection_id).first()
+        if not model:
+            return False
+        self.db.delete(model)
+        self.db.commit()
+        return True
 
     def list_map_detections(self) -> List[Detection]:
         models = (

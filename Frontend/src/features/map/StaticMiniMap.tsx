@@ -2,7 +2,6 @@
 
 import { MapContainer, TileLayer, CircleMarker, Circle, Tooltip } from 'react-leaflet';
 import { useTheme } from 'next-themes';
-import 'leaflet/dist/leaflet.css';
 
 export type MiniMapSeverity = 'low' | 'medium' | 'high' | 'critical' | 'unknown';
 

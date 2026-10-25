@@ -38,6 +38,7 @@ class DetectionSchema(BaseModel):
     features: Optional[dict] = None
     risk: Optional[dict] = None
     authenticity_screening: Optional[dict] = None
+    user_id: Optional[str] = None
 
 
 class BatchDetectResponseSchema(BaseModel):

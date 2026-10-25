@@ -20,8 +20,13 @@ class IDetectionRepository(ABC):
         pass
 
     @abstractmethod
-    def get_all(self, skip: int = 0, limit: int = 10) -> Tuple[List[Detection], int]:
+    def get_all(self, skip: int = 0, limit: int = 10, user_id: Optional[str] = None) -> Tuple[List[Detection], int]:
         """List Detections with pagination. Returns (items, total_count)."""
+        pass
+
+    @abstractmethod
+    def delete(self, detection_id: str) -> bool:
+        """Delete a Detection by ID. Returns True if deleted, False if not found."""
         pass
 
     @abstractmethod

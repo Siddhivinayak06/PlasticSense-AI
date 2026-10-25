@@ -24,9 +24,9 @@ const CATEGORY_COLORS: Record<string, { stroke: string; fill: string }> = {
   default:   { stroke: '#EF4444', fill: 'rgba(239, 68,  68, 0.12)' },
 };
 
-const CHAR_PX   = 7.8;
-const LABEL_H   = 22;
-const LABEL_PAD = 6;
+const CHAR_PX   = 6.2;
+const LABEL_H   = 17;
+const LABEL_PAD = 4;
 
 function formatLabel(className: string, confidence: number): string {
   const name = className.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -223,24 +223,30 @@ export function BoundingBoxOverlay({
               ];
 
               let badgeY = candY[0];
+              let hasFreeSlot = false;
               for (const cy of candY) {
                 const collides = occupiedBadges.some(
                   (occ) => !(x + labelW < occ.x1 || x > occ.x2 || cy + LABEL_H < occ.y1 || cy > occ.y2)
                 );
                 if (!collides) {
                   badgeY = cy;
+                  hasFreeSlot = true;
                   break;
                 }
               }
 
-              occupiedBadges.push({
-                x1: x,
-                y1: badgeY,
-                x2: x + labelW,
-                y2: badgeY + LABEL_H,
-              });
+              const shouldDrawBadge = showLabels && (isHovered || hasFreeSlot || w >= 36);
 
-              const textY  = badgeY + LABEL_H - 6;
+              if (shouldDrawBadge) {
+                occupiedBadges.push({
+                  x1: x,
+                  y1: badgeY,
+                  x2: x + labelW,
+                  y2: badgeY + LABEL_H,
+                });
+              }
+
+              const textY = badgeY + LABEL_H - 4;
 
             return (
               <g
@@ -269,19 +275,20 @@ export function BoundingBoxOverlay({
                 />
 
                 {/* Label badge */}
-                {showLabels && (
+                {(isHovered || shouldDrawBadge) && (
                   <>
                     <rect
                       x={x} y={badgeY}
                       width={labelW} height={LABEL_H}
+                      rx={2}
                       fill={colors.stroke}
                       style={{ pointerEvents: 'none' }}
                     />
                     <text
                       x={x + LABEL_PAD} y={textY}
                       fill={group === 'glass' ? '#000000' : '#ffffff'}
-                      fontSize="13"
-                      fontWeight="700"
+                      fontSize="11"
+                      fontWeight="600"
                       fontFamily="Arial, Helvetica, sans-serif"
                       style={{ pointerEvents: 'none', userSelect: 'none' }}
                     >

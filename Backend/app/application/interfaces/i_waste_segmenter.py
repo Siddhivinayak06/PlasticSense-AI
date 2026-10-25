@@ -2,8 +2,9 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 import numpy as np
+from app.domain.entities.detection import DetectionItem
 
 
 @dataclass
@@ -18,6 +19,7 @@ class SegmenterPrediction:
     processing_time_ms: int = 0
     # Internal mask representations for downstream union or feature processing
     combined_mask: Optional[np.ndarray] = None
+    items: List[DetectionItem] = field(default_factory=list)
 
 
 class IWasteSegmenter(ABC):

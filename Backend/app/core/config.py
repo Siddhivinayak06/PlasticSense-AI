@@ -49,12 +49,12 @@ class Settings(BaseSettings):
     SUPABASE_JWT_SECRET: Optional[str] = None
     SUPABASE_BUCKET_NAME: str = "images"
     # Municipal Administrator emails with elevated management privileges.
-    ADMIN_EMAILS: List[str] = ["bipinkuruvilla134@gmail.com"]
+    ADMIN_EMAILS: Union[List[str], str] = ["bipinkuruvilla134@gmail.com"]
 
     # ── Storage / ML ──────────────────────────────────────────────────────────
     UPLOAD_DIR: str = "media/uploads"
     RESULTS_DIR: str = "media/results"
-    MAX_UPLOAD_SIZE_MB: int = 10
+    MAX_UPLOAD_SIZE_MB: int = 25
 
     # ── Model pipeline paths ──────────────────────────────────────────────────
     # Model selection rationale and evidence: docs/MODEL_SELECTION.md
@@ -63,21 +63,23 @@ class Settings(BaseSettings):
     #             22-class YOLOv8n which also mislabelled plastic as scrap_paper.
     #             Rollback: change DETECTOR_MODEL_PATH to "best_22cls_original.pt".
     # Segmenter = YOLO11s-seg TACO 5-material model, run at its native 960px.
-    DETECTOR_MODEL_PATH: str = "models/external/biaeye-yolo11s/best.pt"
+    DETECTOR_MODEL_PATH: str = "wastesense_detector_best.pt"
     SEGMENTER_MODEL_PATH: str = "taco_segmentation_best.pt"
-    ARCHIVE_MODEL_PATH: str = "best.pt"
-    MODEL_WEIGHTS_PATH: str = "best.pt"  # Legacy backwards compatibility
+    PLASTIC_CLASSIFIER_PATH: str = "plastic_classifier_best.pt"
+    ARCHIVE_MODEL_PATH: str = "wastesense_detector_best.pt"
+    MODEL_WEIGHTS_PATH: str = "wastesense_detector_best.pt"  # Legacy backwards compatibility
 
     # Model inference parameters
-    # High-recall configuration: 0.18 captures dense, weathered dumpsite waste
-    # that clusters in the 0.18-0.30 confidence band, while containment deduplication
+    # High-recall configuration: 0.15 captures dense, weathered dumpsite waste
+    # that clusters in the 0.15-0.30 confidence band, while containment deduplication
     # (IoM >= 0.80) suppresses redundant duplicate boxes without losing separate items.
-    DETECTOR_CONF_THRESHOLD: float = 0.18
-    SEGMENTER_CONF_THRESHOLD: float = 0.25
-    DETECTOR_IOU_THRESHOLD: float = 0.45
+    DETECTOR_CONF_THRESHOLD: float = 0.06
+    SEGMENTER_CONF_THRESHOLD: float = 0.15
+    DETECTOR_IOU_THRESHOLD: float = 0.50
     SEGMENTER_IOU_THRESHOLD: float = 0.50
-    CONFIDENCE_THRESHOLD: float = 0.25  # Legacy backwards compatibility
-    IOU_THRESHOLD: float = 0.45  # Legacy backwards compatibility
+    DETECTOR_AUGMENT: bool = True  # Multi-scale Test-Time Augmentation (TTA)
+    CONFIDENCE_THRESHOLD: float = 0.06  # Legacy backwards compatibility
+    IOU_THRESHOLD: float = 0.50  # Legacy backwards compatibility
     IMAGE_SIZE: int = 960
     INFERENCE_DEVICE: str = "auto"  # 'auto', 'cuda', 'mps', 'cpu'
 

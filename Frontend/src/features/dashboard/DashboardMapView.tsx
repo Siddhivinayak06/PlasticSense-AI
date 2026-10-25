@@ -1,12 +1,13 @@
 'use client';
 
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 import { SeverityBadge } from '@/components/shared/SeverityBadge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useTheme } from 'next-themes';
 import { useEffect } from 'react';
+import { useMounted } from '@/hooks/useMounted';
+import { SkeletonMap } from '@/components/shared/LoadingSkeleton';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMapDetections } from '@/services/detection';
 
@@ -44,6 +45,7 @@ function MapRecenter({ center, zoom }: { center: [number, number]; zoom: number 
 }
 
 export function DashboardMapView() {
+  const mounted = useMounted();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   // Use standard OSM to avoid API key watermarks
@@ -52,7 +54,12 @@ export function DashboardMapView() {
   const { data } = useQuery({
     queryKey: ['mapDetections'],
     queryFn: fetchMapDetections,
+    enabled: mounted,
   });
+
+  if (!mounted) {
+    return <SkeletonMap className="h-full w-full" />;
+  }
 
   const realHotspots: MapHotspot[] = (data?.detections || [])
     .filter((d) => d.latitude != null && d.longitude != null)
@@ -176,3 +183,5 @@ export function DashboardMapView() {
     </div>
   );
 }
+
+export default DashboardMapView;

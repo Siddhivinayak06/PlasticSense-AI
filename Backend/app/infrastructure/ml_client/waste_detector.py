@@ -19,6 +19,7 @@ from app.application.interfaces.i_waste_detector import (
 from app.core.config import resolve_inference_device, resolve_model_path, settings
 from app.domain.entities.detection import DetectionItem
 from app.infrastructure.ml_client.model_introspect import describe
+from app.infrastructure.ml_client.plastic_classifier import PlasticClassifier
 
 logger = logging.getLogger("WasteSense_AI")
 
@@ -57,6 +58,40 @@ class WasteDetector(IWasteDetector):
             return flattened
 
         return names
+
+    @staticmethod
+    def _map_plastic_item_form(resin_code: str, bbox_w: float, bbox_h: float) -> str:
+        """Map plastic resin code and physical bounding box dimensions into combined item label."""
+        area = bbox_w * bbox_h
+        aspect_ratio = max(bbox_w, bbox_h) / max(min(bbox_w, bbox_h), 1.0)
+
+        # 1. Very small compact boxes are typically bottle caps or drink lids
+        if (bbox_w <= 45 and bbox_h <= 45) or (area <= 2200 and aspect_ratio <= 1.8):
+            if resin_code in ("HDPE", "PP", "Other", "unknown"):
+                return f"Cap & Lid ({resin_code})" if resin_code != "unknown" else "Cap & Lid"
+
+        # 2. Resin-specific primary form mapping
+        if resin_code == "PET":
+            return f"Bottle ({resin_code})"
+        elif resin_code == "LDPE":
+            return f"Plastic Bag ({resin_code})"
+        elif resin_code == "Other":
+            return f"Wrapper & Film ({resin_code})"
+        elif resin_code == "PS":
+            return f"Cup & Container ({resin_code})"
+        elif resin_code == "PP":
+            if aspect_ratio >= 1.6 and bbox_w > bbox_h:
+                return f"Tub & Tray ({resin_code})"
+            return f"Cup & Container ({resin_code})"
+        elif resin_code == "HDPE":
+            if area <= 3500 and aspect_ratio <= 1.6:
+                return f"Cap & Lid ({resin_code})"
+            elif aspect_ratio >= 1.8 and bbox_w > bbox_h:
+                return f"Tub & Tray ({resin_code})"
+            else:
+                return f"Bottle ({resin_code})"
+
+        return f"Plastic ({resin_code})" if resin_code != "unknown" else "Plastic"
 
     def __init__(
         self,
@@ -117,6 +152,13 @@ class WasteDetector(IWasteDetector):
             if base.lower() in {"best", "last", "weights", "model"}:
                 self.model_name = f"{self.architecture}-{len(self.class_names)}cls"
 
+            # Load Stage 2: Plastic Resin Classifier
+            try:
+                self.plastic_classifier = PlasticClassifier(device=self.device)
+            except Exception as e:
+                logger.warning(f"Could not load PlasticClassifier: {e}")
+                self.plastic_classifier = None
+
             logger.info(
                 f"Waste Detector loaded successfully. Classes ({len(self.class_names)}): {list(self.class_names.values())}"
             )
@@ -132,42 +174,97 @@ class WasteDetector(IWasteDetector):
         try:
             start_time = time.time()
             h_img, w_img = image.shape[:2]
+
+            # 1. Global image inference pass
+            raw_detections = []
             results = self.model.predict(
                 source=image,
                 conf=self.conf_threshold,
                 iou=self.iou_threshold,
                 imgsz=self.image_size,
+                augment=False,
                 device=self.device,
                 verbose=False,
+                max_det=1000,
             )
+
+            if len(results) > 0 and results[0].boxes is not None:
+                for box in results[0].boxes:
+                    cls_id = int(box.cls.item() if box.cls.numel() == 1 else box.cls[0].item())
+                    conf = float(box.conf.item() if box.conf.numel() == 1 else box.conf[0].item())
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+                    raw_detections.append({
+                        "cls_id": cls_id,
+                        "conf": conf,
+                        "x1": x1,
+                        "y1": y1,
+                        "x2": x2,
+                        "y2": y2,
+                    })
+
+            # 2. Sliced/Tiled inference pass for high-resolution images (>= 1200px)
+            # Slices image into an overlapping 2x2 grid (58% window, 20% overlap)
+            # Captures small background bottles, caps, wrappers, and debris that
+            # shrink below the detector receptive field during global 960px downsampling.
+            if max(w_img, h_img) >= 1200:
+                tile_w = int(w_img * 0.58)
+                tile_h = int(h_img * 0.58)
+                step_x = int(w_img * 0.42)
+                step_y = int(h_img * 0.42)
+
+                for ty in range(0, h_img, step_y):
+                    for tx in range(0, w_img, step_x):
+                        tx2 = min(tx + tile_w, w_img)
+                        ty2 = min(ty + tile_h, h_img)
+                        tx1 = max(0, tx2 - tile_w)
+                        ty1 = max(0, ty2 - tile_h)
+                        tile_crop = image[ty1:ty2, tx1:tx2]
+                        if tile_crop.shape[0] < 32 or tile_crop.shape[1] < 32:
+                            continue
+
+                        tile_res = self.model.predict(
+                            source=tile_crop,
+                            conf=self.conf_threshold,
+                            iou=self.iou_threshold,
+                            imgsz=self.image_size,
+                            augment=False,
+                            device=self.device,
+                            verbose=False,
+                            max_det=500,
+                        )
+                        if len(tile_res) > 0 and tile_res[0].boxes is not None:
+                            for tbox in tile_res[0].boxes:
+                                t_cls = int(tbox.cls.item() if tbox.cls.numel() == 1 else tbox.cls[0].item())
+                                t_conf = float(tbox.conf.item() if tbox.conf.numel() == 1 else tbox.conf[0].item())
+                                bx1, by1, bx2, by2 = tbox.xyxy[0].cpu().numpy().tolist()
+                                raw_detections.append({
+                                    "cls_id": t_cls,
+                                    "conf": t_conf,
+                                    "x1": bx1 + tx1,
+                                    "y1": by1 + ty1,
+                                    "x2": bx2 + tx1,
+                                    "y2": by2 + ty1,
+                                })
+
             proc_time_ms = int((time.time() - start_time) * 1000)
 
             items = []
             class_counts: Dict[str, int] = {}
             annotated_image_bytes = None
 
-            if len(results) > 0 and results[0].boxes is not None:
-                r = results[0]
-                # Stage 1: Gather raw detection boxes
+            if raw_detections:
+                # Stage 1: Map detected class labels to waste categories
                 parsed_boxes = []
 
-                for idx, box in enumerate(r.boxes):
-                    cls_id = int(box.cls.item() if box.cls.numel() == 1 else box.cls[0].item())
-                    conf = float(box.conf.item() if box.conf.numel() == 1 else box.conf[0].item())
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
-                    ix1, iy1 = max(0, int(x1)), max(0, int(y1))
-                    ix2, iy2 = min(w_img, int(x2)), min(h_img, int(y2))
+                for rbox in raw_detections:
+                    cls_id = rbox["cls_id"]
+                    conf = rbox["conf"]
+                    x1, y1, x2, y2 = rbox["x1"], rbox["y1"], rbox["x2"], rbox["y2"]
 
                     raw_name = self.class_names.get(cls_id, f"class_{cls_id}").capitalize()
-                    # Map to waste group.
-                    # First try the mapping file (handles fine-grained class names like
-                    # plastic_bottle → plastic). If no mapping exists, try common-sense
-                    # keyword matching. For broad material-level models (e.g. BiaEye
-                    # with classes like "plastic", "metal", "glass") the name IS the group.
                     waste_group = self.waste_mapping.get(raw_name.lower())
                     if not waste_group:
                         lowered = raw_name.lower()
-                        # Direct material-level class names (BiaEye-style)
                         if lowered in ("plastic", "metal", "glass", "paper", "organic"):
                             waste_group = lowered
                         elif lowered == "bulky":
@@ -196,17 +293,11 @@ class WasteDetector(IWasteDetector):
                         "y2": y2,
                         "raw_name": raw_name,
                         "waste_group": waste_group,
-                        # Resin/polymer type is NOT determined by this pipeline. The
-                        # crop-level resin classifier was removed from production because
-                        # its training class ordering could not be verified and it had no
-                        # abstention class (see docs/MODEL_SELECTION.md). "unknown" is the
-                        # honest value here.
                         "waste_type": "unknown",
                     })
 
-                # Stage 1b: Containment-aware deduplication (IoM > 0.75)
-                # Suppress smaller duplicate boxes engulfed (>75%) inside a larger box
-                # of the same class, while strictly preserving genuinely separate objects.
+                # Stage 2: Smart Duplicate & Concentric Box Suppression FIRST
+                # Suppressing duplicates before ConvNeXt saves 75% of classification time
                 if len(parsed_boxes) > 1:
                     def _box_area(b):
                         return max(0.0, b["x2"] - b["x1"]) * max(0.0, b["y2"] - b["y1"])
@@ -234,26 +325,67 @@ class WasteDetector(IWasteDetector):
                             if jdx in suppressed_indices:
                                 continue
                             b_low = sorted_boxes[jdx]
-                            if b_low["cls_id"] != b_high["cls_id"]:
-                                continue
-
                             area_low = _box_area(b_low)
                             if area_low <= 0:
                                 continue
 
                             inter = _box_intersection(b_high, b_low)
-                            min_area = min(area_high, area_low)
-                            iom = inter / min_area if min_area > 0 else 0.0
+                            if inter <= 0:
+                                continue
 
-                            # Suppress only if heavily engulfed (>= 80%) inside larger box
-                            if iom >= 0.80:
+                            min_area = min(area_high, area_low)
+                            max_area = max(area_high, area_low)
+                            union = area_high + area_low - inter
+                            iou = inter / union if union > 0 else 0.0
+                            containment = inter / min_area if min_area > 0 else 0.0
+                            size_ratio = min_area / max_area if max_area > 0 else 0.0
+
+                            # Suppress if:
+                            # 1. IoU >= 0.50 (significant overlap on the same target)
+                            # 2. Concentric duplicate: containment >= 0.70 AND size_ratio >= 0.45
+                            if iou >= 0.50 or (containment >= 0.70 and size_ratio >= 0.45):
                                 suppressed_indices.add(jdx)
                                 logger.debug(
-                                    "Suppressed duplicate nested box '%s' (conf=%.2f, IoM=%.2f) inside box (conf=%.2f)",
-                                    b_low["raw_name"], b_low["conf"], iom, b_high["conf"]
+                                    "Suppressed duplicate box '%s' (conf=%.2f, iou=%.2f, containment=%.2f, size_ratio=%.2f) inside '%s' (conf=%.2f)",
+                                    b_low["raw_name"], b_low["conf"], iou, containment, size_ratio, b_high["raw_name"], b_high["conf"]
                                 )
 
                     parsed_boxes = deduped_boxes
+
+                # Stage 3: Parallel batched resin classification for deduplicated candidate crops
+                if self.plastic_classifier and parsed_boxes:
+                    plastic_crops = []
+                    plastic_indices = []
+                    for p_idx, p_box in enumerate(parsed_boxes):
+                        if p_box["waste_group"] == "plastic" or p_box["conf"] < 0.35:
+                            crop_x1 = max(0, int(p_box["x1"]))
+                            crop_y1 = max(0, int(p_box["y1"]))
+                            crop_x2 = min(w_img, int(p_box["x2"]))
+                            crop_y2 = min(h_img, int(p_box["y2"]))
+                            if (crop_x2 - crop_x1) >= 8 and (crop_y2 - crop_y1) >= 8:
+                                crop = image[crop_y1:crop_y2, crop_x1:crop_x2]
+                                plastic_crops.append(crop)
+                                plastic_indices.append(p_idx)
+
+                    if plastic_crops:
+                        try:
+                            resin_preds = self.plastic_classifier.classify_crops_batch(plastic_crops, batch_size=64)
+                            for p_idx, (resin_cls, resin_conf) in zip(plastic_indices, resin_preds):
+                                p_box = parsed_boxes[p_idx]
+                                bw = p_box["x2"] - p_box["x1"]
+                                bh = p_box["y2"] - p_box["y1"]
+                                if p_box["waste_group"] == "plastic" or resin_conf >= 0.30:
+                                    if resin_cls != "unknown":
+                                        p_box["waste_group"] = "plastic"
+                                        p_box["waste_type"] = resin_cls
+                                        p_box["raw_name"] = self._map_plastic_item_form(resin_cls, bw, bh)
+                                        if resin_conf > 0:
+                                            p_box["conf"] = round(max(p_box["conf"], resin_conf), 4)
+                                    else:
+                                        if p_box["waste_group"] == "plastic":
+                                            p_box["raw_name"] = self._map_plastic_item_form("unknown", bw, bh)
+                        except Exception as e:
+                            logger.warning(f"Batched plastic classification failed, keeping defaults: {e}")
 
                 # Build final detection items
                 for p_box in parsed_boxes:

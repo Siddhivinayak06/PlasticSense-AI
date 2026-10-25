@@ -154,6 +154,7 @@ class DetectionService:
             model_version="v1.0",
             detection_status="pending",
             items=[],
+            user_id=dto.user_id,
         )
 
         saved = self.repository.save(detection)
@@ -216,18 +217,23 @@ class DetectionService:
             assessment = self.risk_service.get_for_detection(detection_id)
         return self._to_dto(detection, assessment=assessment)
 
-    def list_detections(self, page: int = 1, limit: int = 10) -> Tuple[List[DetectionResponseDTO], int]:
+    def list_detections(
+        self, page: int = 1, limit: int = 10, user_id: Optional[str] = None
+    ) -> Tuple[List[DetectionResponseDTO], int]:
         if page < 1:
             page = 1
         if limit < 1 or limit > 100:
             limit = 10
         skip = (page - 1) * limit
-        items, total = self.repository.get_all(skip=skip, limit=limit)
+        items, total = self.repository.get_all(skip=skip, limit=limit, user_id=user_id)
         dtos = []
         for d in items:
             assessment = getattr(d, "risk_assessment", None)
             dtos.append(self._to_dto(d, assessment=assessment))
         return dtos, total
+
+    def delete_detection(self, detection_id: str) -> bool:
+        return self.repository.delete(detection_id)
 
     def list_map_detections(self) -> List[DetectionResponseDTO]:
         items = self.repository.list_map_detections()
@@ -356,4 +362,5 @@ class DetectionService:
             features=features_data,
             risk=risk_data,
             authenticity_screening=screening,
+            user_id=getattr(detection, "user_id", None),
         )

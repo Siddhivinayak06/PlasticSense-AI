@@ -8,7 +8,7 @@ import numpy as np
 from app.domain.entities.detection import DetectionItem
 
 
-@dataclass(frozen=True)
+@dataclass
 class DetectorPrediction:
     """Standardized output from Model 1 fine-grained detector."""
     model_name: str

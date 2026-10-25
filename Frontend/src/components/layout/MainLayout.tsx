@@ -7,13 +7,14 @@ import { Navbar } from './Navbar';
 import { Footer } from './Footer';
 import { MobileDrawer } from './MobileDrawer';
 import { AuthGuard } from '@/components/auth/AuthGuard';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { fadeIn } from '@/lib/motion';
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   // Public pages get NO dashboard layout chrome
-  if (pathname === '/' || pathname === '/login' || pathname?.startsWith('/auth')) {
+  if (pathname === '/' || pathname === '/login' || pathname?.startsWith('/auth') || pathname === '/logout') {
     return <>{children}</>;
   }
 
@@ -37,7 +38,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                   exit="hidden"
                   className="w-full"
                 >
-                  {children}
+                  <ErrorBoundary>
+                    {children}
+                  </ErrorBoundary>
                 </motion.div>
               </AnimatePresence>
             </div>

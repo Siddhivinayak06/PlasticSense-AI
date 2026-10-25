@@ -52,6 +52,10 @@ export async function signInWithGoogle(returnTo: string = '/dashboard') {
     throw error;
   }
 
+  if (data?.url && typeof window !== 'undefined') {
+    window.location.href = data.url;
+  }
+
   return data;
 }
 

@@ -107,15 +107,32 @@ CREATE TABLE risk_assessments (
 
 CREATE TABLE user_profiles (
 	id VARCHAR(36) NOT NULL, 
+	google_sub VARCHAR(255),
 	email VARCHAR(255) NOT NULL, 
 	full_name VARCHAR(255), 
 	avatar_url VARCHAR(512), 
-	role VARCHAR(32) DEFAULT 'user' NOT NULL, 
+	role VARCHAR(32) DEFAULT 'citizen' NOT NULL, 
+	is_active BOOLEAN DEFAULT TRUE NOT NULL,
+	last_login_at TIMESTAMP WITH TIME ZONE,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL, 
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL, 
 	PRIMARY KEY (id), 
-	UNIQUE (email)
+	UNIQUE (email),
+	UNIQUE (google_sub)
 );
+
+CREATE TABLE role_audit_logs (
+	id VARCHAR(36) PRIMARY KEY,
+	user_id VARCHAR(36) NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+	changed_by_admin_id VARCHAR(36) NOT NULL,
+	old_role VARCHAR(32) NOT NULL,
+	new_role VARCHAR(32) NOT NULL,
+	reason TEXT,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX ix_role_audit_logs_user_id ON role_audit_logs(user_id);
+CREATE INDEX ix_role_audit_logs_created_at ON role_audit_logs(created_at);
 
 -- RLS: Enable Row Level Security on user_profiles
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
@@ -147,26 +164,67 @@ WITH CHECK (
   role = (SELECT role FROM user_profiles WHERE id = auth.uid()::text)
 );
 
--- Trigger: Automatically create a user_profile when a user signs in with Google OAuth for the first time
+-- Policy 4: Allow authenticated users to insert/sync their profile
+CREATE POLICY "Users can insert their own profile" 
+ON user_profiles 
+FOR INSERT 
+WITH CHECK (auth.uid()::text = id);
+
+-- Trigger: Automatically create or update user_profile when a user signs in with Google OAuth
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
+DECLARE
+  existing_id VARCHAR(36);
+  assigned_role VARCHAR(32);
 BEGIN
-  INSERT INTO public.user_profiles (id, email, full_name, avatar_url, role)
-  VALUES (
-    new.id::text,
-    new.email,
-    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    new.raw_user_meta_data->>'avatar_url',
-    'user' -- Default role is always normal user
-  )
-  ON CONFLICT (id) DO UPDATE SET
-    email = EXCLUDED.email,
-    full_name = COALESCE(EXCLUDED.full_name, user_profiles.full_name),
-    avatar_url = COALESCE(EXCLUDED.avatar_url, user_profiles.avatar_url),
-    updated_at = NOW();
+  -- Check if this email should have admin access
+  assigned_role := 'user';
+  IF LOWER(new.email) IN ('siddhivinayaksawant04@gmail.com', 'bipinkuruvilla134@gmail.com') THEN
+    assigned_role := 'admin';
+  END IF;
+
+  -- Check if profile already exists by email
+  SELECT id INTO existing_id FROM public.user_profiles WHERE LOWER(email) = LOWER(new.email);
+
+  IF existing_id IS NOT NULL THEN
+    -- Update existing profile to link to the new Supabase Auth UUID
+    UPDATE public.user_profiles
+    SET id = new.id::text,
+        full_name = COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', user_profiles.full_name),
+        avatar_url = COALESCE(new.raw_user_meta_data->>'avatar_url', user_profiles.avatar_url),
+        role = CASE WHEN assigned_role = 'admin' THEN 'admin' ELSE user_profiles.role END,
+        updated_at = NOW()
+    WHERE id = existing_id;
+  ELSE
+    -- Insert new user profile
+    INSERT INTO public.user_profiles (id, email, full_name, avatar_url, role, created_at, updated_at)
+    VALUES (
+      new.id::text,
+      LOWER(new.email),
+      COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+      new.raw_user_meta_data->>'avatar_url',
+      assigned_role,
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      email = EXCLUDED.email,
+      full_name = COALESCE(EXCLUDED.full_name, user_profiles.full_name),
+      avatar_url = COALESCE(EXCLUDED.avatar_url, user_profiles.avatar_url),
+      updated_at = NOW();
+  END IF;
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- Log warning but NEVER abort auth.users user creation
+  RAISE WARNING 'handle_new_user error: %', SQLERRM;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created

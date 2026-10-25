@@ -6,10 +6,11 @@ import { Map, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { SkeletonMap } from '@/components/shared/LoadingSkeleton';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { cardEntrance } from '@/lib/motion';
 
 const DashboardMapView = dynamic(
-  () => import('./DashboardMapView').then((mod) => mod.DashboardMapView),
+  () => import('./DashboardMapView'),
   {
     ssr: false,
     loading: () => <SkeletonMap className="h-[400px]" />,
@@ -43,7 +44,9 @@ export function DashboardMap() {
       </div>
 
       <div className="h-[400px]">
-        <DashboardMapView />
+        <ErrorBoundary>
+          <DashboardMapView />
+        </ErrorBoundary>
       </div>
     </motion.div>
   );

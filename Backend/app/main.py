@@ -55,10 +55,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX or r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Accept", "Authorization"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Largest legitimate request: a full batch of maximum-size images plus form overhead.
@@ -67,12 +67,19 @@ _MAX_BODY_BYTES = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024 * settings.MAX_BATCH
 
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
+    if request.method == "OPTIONS" and request.headers.get("access-control-request-private-network"):
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
+
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > _MAX_BODY_BYTES:
         return JSONResponse(status_code=413, content={"detail": "Request body too large"})
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
+    if request.headers.get("access-control-request-private-network"):
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
     if request.url.path.startswith("/media/"):
         # User-supplied images: never let a stored file execute as a document.
         response.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; sandbox"

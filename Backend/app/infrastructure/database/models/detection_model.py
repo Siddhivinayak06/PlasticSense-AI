@@ -21,8 +21,10 @@ class DetectionModel(Base):
     detection_status = Column(String(32), nullable=False, default="pending")
     failure_reason = Column(String(512), nullable=True)
     processing_time_ms = Column(Float, nullable=True)
+    user_id = Column(String(36), ForeignKey("user_profiles.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
+    user = relationship("UserProfileModel", foreign_keys=[user_id], lazy="selectin")
     items = relationship(
         "DetectionItemModel",
         back_populates="detection",

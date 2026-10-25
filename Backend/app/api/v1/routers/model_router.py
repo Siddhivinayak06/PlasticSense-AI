@@ -47,13 +47,22 @@ async def get_model_info(
             "iou_threshold": settings.SEGMENTER_IOU_THRESHOLD,
             "provenance": getattr(segmenter, "provenance", None),
         },
+        "classifier": {
+            "name": "Plastic Resin Classifier",
+            "architecture": "convnext_base",
+            "task": "resin_identification",
+            "model_path": getattr(getattr(detector, "plastic_classifier", None), "model_path", getattr(settings, "PLASTIC_CLASSIFIER_PATH", "old_models/plastic_classifier_best.pt")),
+            "classes": getattr(getattr(detector, "plastic_classifier", None), "CLASS_NAMES", ["HDPE", "LDPE", "Other", "PET", "PP", "PS"]),
+            "status": "loaded" if getattr(detector, "plastic_classifier", None) and getattr(detector.plastic_classifier, "model", None) else "unavailable",
+        },
         "image_size": settings.IMAGE_SIZE,
         "capabilities": {
             "item_detection": True,
             "material_instance_segmentation": True,
             "waste_area_estimation": "indicative_heuristic",
-            "resin_polymer_identification": False,
+            "resin_polymer_identification": getattr(detector, "plastic_classifier", None) is not None and getattr(detector.plastic_classifier, "model", None) is not None,
             "waste_mass_estimation": False,
             "hotspot_forecasting": False,
         },
     }
+
