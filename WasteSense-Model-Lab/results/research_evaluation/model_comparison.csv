@@ -1,0 +1,7 @@
+model_name,display_name,task,resolution,confidence_threshold,iou_threshold,parameters,weight_size_mb,precision,recall,f1_score,mAP50,mAP50_95,latency_mean_ms,latency_median_ms,latency_p95_ms,throughput_fps,peak_vram_mb,mean_mask_coverage_pct,citation
+BiaEye_YOLO11s,BiaEye YOLO11s (Baseline),detect,960,0.25,0.45,9430114,18.27,0.8378,0.7209,0.775,0.5387,0.5196,50.62,41.54,105.95,19.8,196.9,0.0,BiaEye Waste Benchmark (2024)
+BiaEye_YOLO11s_Cleaned,BiaEye YOLO11s (High-Recall + Cleaned),detect,960,0.18,0.45,9430114,18.27,0.7709,0.814,0.7919,0.6233,0.6003,34.87,32.48,65.32,28.7,209.6,0.0,WasteSense AI (This Work)
+TACO_YOLO11s_Seg,TACO YOLO11s-seg,segment,960,0.25,0.45,10084223,19.57,0.7556,0.3163,0.4459,0.3622,0.3444,41.45,39.76,72.44,24.1,264.7,8.46,TACO Dataset Pretrained (Proença et al.)
+PlasticSense_YOLO11s,PlasticSense YOLO11s (10-cls),detect,960,0.25,0.45,9431662,18.31,0.0,0.0,0.0,0.0,0.0,36.09,34.1,66.18,27.7,304.3,0.0,PlasticSense Baseline 10-Class
+Roboflow_22cls_YOLOv8n,Roboflow 22-Class YOLOv8n,detect,640,0.25,0.45,3015138,5.97,0.3529,0.0279,0.0517,0.0373,0.0353,30.81,32.78,58.96,32.5,67.0,0.0,Waste Detection V2 (Roboflow)
+HF_YOLOv8m_Seg,HuggingFace YOLOv8m-seg,segment,640,0.25,0.45,27242543,52.25,0.2326,0.0465,0.0775,0.0215,0.0145,42.14,37.32,80.12,23.7,217.7,6.39,HF Waste Seg Benchmark

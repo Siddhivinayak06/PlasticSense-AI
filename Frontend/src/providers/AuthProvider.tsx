@@ -44,7 +44,7 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(isSupabaseConfigured);
 
   const fetchProfile = useCallback(async (sessionUser?: User | null) => {
     const targetUser = sessionUser || user;
@@ -87,7 +87,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setIsLoading(false);
       return;
     }
 

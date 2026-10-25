@@ -76,6 +76,7 @@ wandb/
 /results/
 WasteSense-Model-Lab/results/*
 !WasteSense-Model-Lab/results/final_handoff/
+!WasteSense-Model-Lab/results/research_evaluation/
 
 # OS generated files
 .DS_Store
@@ -107,7 +108,8 @@ WasteSense-Model-Lab/models/
 WasteSense-Model-Lab/bower-seegull/
 WasteSense-Model-Lab/comparison_results/
 WasteSense-Model-Lab/test_images/
-WasteSense-Model-Lab/dataset/
+WasteSense-Model-Lab/dataset/*
+!WasteSense-Model-Lab/dataset/ground_truth/
 WasteSense-Model-Lab/reports/**/*.png
 
 # Unexpanded duplicate of handoff_to_cachyos/models/
