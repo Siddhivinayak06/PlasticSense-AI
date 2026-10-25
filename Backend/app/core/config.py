@@ -46,7 +46,10 @@ class Settings(BaseSettings):
     SQLITE_PATH: Optional[str] = None
     SUPABASE_URL: Optional[str] = None
     SUPABASE_KEY: Optional[str] = None
+    SUPABASE_JWT_SECRET: Optional[str] = None
     SUPABASE_BUCKET_NAME: str = "images"
+    # Municipal Administrator emails with elevated management privileges.
+    ADMIN_EMAILS: List[str] = ["bipinkuruvilla134@gmail.com"]
 
     # ── Storage / ML ──────────────────────────────────────────────────────────
     UPLOAD_DIR: str = "media/uploads"
@@ -133,6 +136,21 @@ class Settings(BaseSettings):
         elif isinstance(v, (list, str)):
             return v
         raise ValueError(v)
+
+    @field_validator("ADMIN_EMAILS", mode="before")
+    @classmethod
+    def assemble_admin_emails(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [i.strip().lower() for i in v.split(",") if i.strip()]
+        elif isinstance(v, list):
+            return [str(i).strip().lower() for i in v if str(i).strip()]
+        return ["bipinkuruvilla134@gmail.com"]
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -105,3 +105,72 @@ CREATE TABLE risk_assessments (
 
 ;
 
+CREATE TABLE user_profiles (
+	id VARCHAR(36) NOT NULL, 
+	email VARCHAR(255) NOT NULL, 
+	full_name VARCHAR(255), 
+	avatar_url VARCHAR(512), 
+	role VARCHAR(32) DEFAULT 'user' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL, 
+	PRIMARY KEY (id), 
+	UNIQUE (email)
+);
+
+-- RLS: Enable Row Level Security on user_profiles
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Policy 1: Users can read their own profile
+CREATE POLICY "Users can read own profile" 
+ON user_profiles 
+FOR SELECT 
+USING (auth.uid()::text = id);
+
+-- Policy 2: Municipal Admins can view all user profiles
+CREATE POLICY "Admins can view all profiles" 
+ON user_profiles 
+FOR SELECT 
+USING (
+  EXISTS (
+    SELECT 1 FROM user_profiles 
+    WHERE id = auth.uid()::text AND role = 'admin'
+  )
+);
+
+-- Policy 3: Users can update their own personal info (name, avatar), but NOT their role
+CREATE POLICY "Users can update own personal info" 
+ON user_profiles 
+FOR UPDATE 
+USING (auth.uid()::text = id)
+WITH CHECK (
+  auth.uid()::text = id AND 
+  role = (SELECT role FROM user_profiles WHERE id = auth.uid()::text)
+);
+
+-- Trigger: Automatically create a user_profile when a user signs in with Google OAuth for the first time
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.user_profiles (id, email, full_name, avatar_url, role)
+  VALUES (
+    new.id::text,
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    new.raw_user_meta_data->>'avatar_url',
+    'user' -- Default role is always normal user
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = COALESCE(EXCLUDED.full_name, user_profiles.full_name),
+    avatar_url = COALESCE(EXCLUDED.avatar_url, user_profiles.avatar_url),
+    updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+

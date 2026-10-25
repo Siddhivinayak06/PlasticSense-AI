@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { AuthProvider } from "@/providers/AuthProvider";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { Toaster } from "@/components/ui/sonner";
@@ -25,10 +26,12 @@ export default function RootLayout({
         <ErrorBoundary>
           <ThemeProvider>
             <QueryProvider>
-              <MainLayout>
-                {children}
-              </MainLayout>
-              <Toaster richColors closeButton position="bottom-right" />
+              <AuthProvider>
+                <MainLayout>
+                  {children}
+                </MainLayout>
+                <Toaster richColors closeButton position="bottom-right" />
+              </AuthProvider>
             </QueryProvider>
           </ThemeProvider>
         </ErrorBoundary>
@@ -36,3 +39,4 @@ export default function RootLayout({
     </html>
   );
 }
+

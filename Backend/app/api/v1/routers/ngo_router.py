@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.api.dependencies import get_db
+from app.core.auth import get_current_user_optional
 from app.core.cache import cache_clear
 from app.infrastructure.database.models.ngo_model import NGOTeamModel
+from app.infrastructure.database.models.user_profile_model import UserProfileModel
 
 router = APIRouter(prefix="/ngos", tags=["NGO Teams"])
 
@@ -49,8 +51,27 @@ async def list_ngos(db: Session = Depends(get_db)):
     return teams
 
 
-@router.post("", response_model=NGOSchema, status_code=status.HTTP_201_CREATED, summary="Create a new NGO team")
-async def create_ngo(payload: NGOCreateSchema, db: Session = Depends(get_db)):
+def _enforce_admin_permission(user: Optional[UserProfileModel]) -> None:
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required: Municipal Administrator sign-in needed.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Municipal Administrator privileges required for this action.",
+        )
+
+
+@router.post("", response_model=NGOSchema, status_code=status.HTTP_201_CREATED, summary="Create a new NGO team (Admin only)")
+async def create_ngo(
+    payload: NGOCreateSchema,
+    db: Session = Depends(get_db),
+    admin: Optional[UserProfileModel] = Depends(get_current_user_optional),
+):
+    _enforce_admin_permission(admin)
     team = NGOTeamModel(
         id=str(uuid.uuid4()),
         name=payload.name,

@@ -14,6 +14,7 @@ from app.api.v1.routers import (
     model_router,
     ngo_router,
     assignment_router,
+    auth_router,
 )
 from app.core.config import settings
 from app.core.logging import logger
@@ -55,9 +56,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "Accept"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Accept", "Authorization"],
 )
 
 # Largest legitimate request: a full batch of maximum-size images plus form overhead.
@@ -89,6 +90,7 @@ app.mount("/media/results", StaticFiles(directory=settings.RESULTS_DIR), name="r
 
 # Include Routers
 app.include_router(health.router, prefix=settings.API_V1_STR)
+app.include_router(auth_router.router, prefix=settings.API_V1_STR)
 app.include_router(model_router.router, prefix=settings.API_V1_STR)
 app.include_router(detection_router.router, prefix=settings.API_V1_STR)
 app.include_router(risk_router.router, prefix=settings.API_V1_STR)

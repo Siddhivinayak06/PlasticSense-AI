@@ -23,6 +23,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { useAuth } from "@/providers/AuthProvider";
 
 /* ─── Animated counter ─── */
 function Counter({ value, suffix = "" }: { value: number; suffix?: string }) {
@@ -70,6 +71,8 @@ export default function LandingPage() {
 
   const { resolvedTheme } = useTheme();
   const mounted = useMounted();
+  const { isAuthenticated } = useAuth();
+  const launchHref = isAuthenticated ? "/dashboard" : "/login?returnTo=/dashboard";
 
   const isLightMode = mounted ? resolvedTheme === "light" : false;
 
@@ -114,11 +117,15 @@ export default function LandingPage() {
           <div className="flex items-center gap-2 sm:gap-4">
             <ThemeToggle />
             <Link
-              href="/dashboard"
+              href={launchHref}
               className="flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-slate-950 px-5 py-2.5 text-sm font-semibold transition-all hover:shadow-[0_0_20px_-5px_rgba(16,185,129,0.5)] active:scale-95"
             >
-              <span className="hidden sm:inline">Launch App</span>
-              <span className="inline sm:hidden">Launch</span>
+              <span className="hidden sm:inline">
+                {isAuthenticated ? "Open Dashboard" : "Launch WasteSense"}
+              </span>
+              <span className="inline sm:hidden">
+                {isAuthenticated ? "Dashboard" : "Launch"}
+              </span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -188,10 +195,10 @@ export default function LandingPage() {
               className="flex flex-wrap gap-4"
             >
               <Link
-                href="/dashboard"
+                href={launchHref}
                 className="group flex items-center gap-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 dark:from-emerald-500 dark:to-cyan-500 dark:hover:from-emerald-400 dark:hover:to-cyan-400 text-white dark:text-slate-950 px-8 py-4 rounded-2xl font-bold text-base transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
               >
-                Explore Dashboard
+                {isAuthenticated ? "Explore Dashboard" : "Launch WasteSense"}
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
@@ -530,10 +537,10 @@ export default function LandingPage() {
             up our planet — one detection at a time.
           </p>
           <Link
-            href="/dashboard"
+            href={launchHref}
             className="group inline-flex items-center gap-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white dark:text-slate-950 px-10 py-5 rounded-2xl font-semibold text-lg transition-all shadow-[0_0_60px_-12px_rgba(16,185,129,0.5)]"
           >
-            Get Started — It&apos;s Free
+            {isAuthenticated ? "Enter Dashboard" : "Get Started with Google"}
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
         </FadeIn>

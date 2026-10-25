@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getAccessToken } from './supabase';
 
 export function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) {
@@ -18,8 +19,16 @@ export const api = axios.create({
   timeout: 120_000,
 });
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
   config.baseURL = `${getBaseUrl()}/api/v1`;
+  try {
+    const token = await getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    // Graceful fallback for non-browser contexts or uninitialized auth
+  }
   return config;
 });
 

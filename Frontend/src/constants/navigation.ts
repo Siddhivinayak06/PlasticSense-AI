@@ -10,6 +10,7 @@ import {
   Building2,
   ShieldCheck,
   TrendingUp,
+  Users,
 } from 'lucide-react';
 import type { SidebarMenuGroup } from '@/types/dashboard';
 
@@ -97,6 +98,12 @@ export const sidebarMenuGroups: SidebarMenuGroup[] = [
         label: 'System Status',
         icon: Settings,
         href: '/settings',
+      },
+      {
+        id: 'users',
+        label: 'User & Roles',
+        icon: Users,
+        href: '/users',
       },
     ],
   },

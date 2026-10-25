@@ -8,11 +8,13 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_db, get_detection_service
 from app.api.upload_guard import inference_rate_limit
 from app.api.v1.routers.detection_router import run_detection
+from app.core.auth import get_current_user_optional
 from app.core.cache import cache_clear
 from app.application.services.detection_service import DetectionService
 from app.infrastructure.database.models.assignment_model import CleanupAssignmentModel
 from app.infrastructure.database.models.ngo_model import NGOTeamModel
 from app.infrastructure.database.models.detection_model import DetectionModel
+from app.infrastructure.database.models.user_profile_model import UserProfileModel
 
 router = APIRouter(prefix="/assignments", tags=["Cleanup Assignments"])
 
@@ -91,11 +93,27 @@ async def list_assignments(
     return query.all()
 
 
-@router.post("", response_model=AssignmentSchema, status_code=status.HTTP_201_CREATED, summary="Create a cleanup assignment")
+def _enforce_admin_permission(user: Optional[UserProfileModel]) -> None:
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required: Municipal Administrator sign-in needed.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Municipal Administrator privileges required for this action.",
+        )
+
+
+@router.post("", response_model=AssignmentSchema, status_code=status.HTTP_201_CREATED, summary="Create a cleanup assignment (Admin only)")
 async def create_assignment(
     payload: AssignmentCreateSchema,
     db: Session = Depends(get_db),
+    admin: Optional[UserProfileModel] = Depends(get_current_user_optional),
 ):
+    _enforce_admin_permission(admin)
     # If detection_id provided, inherit coordinates, image, waste_count if not given
     lat = payload.latitude
     lng = payload.longitude
@@ -169,12 +187,14 @@ async def get_assignment(assignment_id: str, db: Session = Depends(get_db)):
     return assignment
 
 
-@router.patch("/{assignment_id}", response_model=AssignmentSchema, summary="Update assignment status or details")
+@router.patch("/{assignment_id}", response_model=AssignmentSchema, summary="Update assignment status or details (Admin only)")
 async def update_assignment(
     assignment_id: str,
     payload: AssignmentUpdateSchema,
     db: Session = Depends(get_db),
+    admin: Optional[UserProfileModel] = Depends(get_current_user_optional),
 ):
+    _enforce_admin_permission(admin)
     assignment = db.query(CleanupAssignmentModel).filter(CleanupAssignmentModel.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -214,15 +234,17 @@ async def update_assignment(
     return assignment
 
 
-@router.post("/{assignment_id}/verify", response_model=AssignmentSchema, summary="Run AI verification on post-cleanup image")
+@router.post("/{assignment_id}/verify", response_model=AssignmentSchema, summary="Run AI verification on post-cleanup image (Admin only)")
 async def verify_assignment(
     assignment_id: str,
     file: UploadFile = File(...),
     notes: Optional[str] = Form(None, max_length=2000),
     detection_service: DetectionService = Depends(get_detection_service),
     db: Session = Depends(get_db),
+    admin: Optional[UserProfileModel] = Depends(get_current_user_optional),
     _limited: None = Depends(inference_rate_limit),
 ):
+    _enforce_admin_permission(admin)
     assignment = db.query(CleanupAssignmentModel).filter(CleanupAssignmentModel.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
