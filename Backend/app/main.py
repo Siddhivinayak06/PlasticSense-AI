@@ -15,6 +15,7 @@ from app.api.v1.routers import (
     ngo_router,
     assignment_router,
     auth_router,
+    live_detection_router,
 )
 from app.core.config import settings
 from app.core.logging import logger
@@ -104,6 +105,7 @@ app.include_router(risk_router.router, prefix=settings.API_V1_STR)
 app.include_router(statistics_router.router, prefix=settings.API_V1_STR)
 app.include_router(ngo_router.router, prefix=settings.API_V1_STR)
 app.include_router(assignment_router.router, prefix=settings.API_V1_STR)
+app.include_router(live_detection_router.router, prefix=settings.API_V1_STR)
 
 
 

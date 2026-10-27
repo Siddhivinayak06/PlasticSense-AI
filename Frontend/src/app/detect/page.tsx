@@ -16,6 +16,9 @@ import {
   Info,
   BarChart3,
   RefreshCw,
+  Camera,
+  Aperture,
+  SwitchCamera,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { submitDetection, fetchRiskAssessment, resolveImageUrl, fetchSystemHealth, fetchSystemConfig, riskFromDetection, type SystemConfig } from '@/services/detection';
@@ -127,6 +130,355 @@ function ImagePreview({
           <X className="size-3.5" />
         </button>
       </div>
+    </motion.div>
+  );
+}
+
+// ─── Detect Mode ────────────────────────────────────────────────
+
+type DetectMode = 'upload' | 'camera';
+
+function DirectCameraSnapView({
+  onSnap,
+}: {
+  onSnap: (file: File) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const nativeCameraInputRef = useRef<HTMLInputElement>(null);
+
+  const [cameraState, setCameraState] = useState<'idle' | 'opening' | 'active' | 'error'>('idle');
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [cameraError, setCameraError] = useState('');
+  const [captureFlash, setCaptureFlash] = useState(false);
+
+  // Discover all available video input devices
+  const refreshDevices = useCallback(async () => {
+    try {
+      if (navigator.mediaDevices?.enumerateDevices) {
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        const vDevs = devs.filter((d) => d.kind === 'videoinput');
+        setVideoDevices(vDevs);
+        return vDevs;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  }, []);
+
+  useEffect(() => {
+    refreshDevices();
+  }, [refreshDevices]);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraState('idle');
+  }, []);
+
+  const startCamera = useCallback(async (preferredDeviceId?: string) => {
+    setCameraState('opening');
+    setCameraError('');
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera access is not supported by your browser.');
+      }
+
+      const devs = await refreshDevices();
+      let stream: MediaStream | null = null;
+      let lastErr: unknown = null;
+
+      // Build priority list of device IDs to try:
+      // 1. Explicit preferredDeviceId (if user selected one)
+      // 2. Devices that mention "Integrated" or "Built-in"
+      // 3. Other detected video devices
+      const candidateIds: (string | undefined)[] = [];
+      if (preferredDeviceId) {
+        candidateIds.push(preferredDeviceId);
+      }
+      // Prioritize integrated camera if not explicitly specified
+      const integrated = devs.find((d) => d.label.toLowerCase().includes('integrated') || d.label.toLowerCase().includes('internal'));
+      if (integrated && integrated.deviceId !== preferredDeviceId) {
+        candidateIds.push(integrated.deviceId);
+      }
+      for (const d of devs) {
+        if (!candidateIds.includes(d.deviceId)) {
+          candidateIds.push(d.deviceId);
+        }
+      }
+      if (candidateIds.length === 0) {
+        candidateIds.push(undefined);
+      }
+
+      // Try each candidate until one connects
+      for (const devId of candidateIds) {
+        try {
+          const constraints: MediaStreamConstraints = {
+            video: devId
+              ? { deviceId: { exact: devId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+              : true,
+            audio: false,
+          };
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (stream) {
+            if (devId) setSelectedDeviceId(devId);
+            break;
+          }
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      // Final generic fallback
+      if (!stream) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      if (!stream) {
+        throw lastErr || new Error('Could not start any video source.');
+      }
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      // Refresh devices again so labels become available after permission is granted
+      refreshDevices();
+      setCameraState('active');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isLocked = msg.includes('Could not start video source') || (err as { name?: string })?.name === 'NotReadableError';
+
+      if (isLocked) {
+        setCameraError(
+          'Camera is locked: another application (e.g. Microsoft Teams or Zoom) is running, or your laptop camera privacy slider is closed.',
+        );
+      } else if (msg.includes('NotAllowed') || msg.includes('Permission')) {
+        setCameraError('Camera permission was denied. Please allow camera access in your browser address bar.');
+      } else if (msg.includes('NotFound') || msg.includes('DevicesNotFound')) {
+        setCameraError('No camera device detected on this computer.');
+      } else {
+        setCameraError(`Camera error: ${msg}`);
+      }
+      setCameraState('error');
+    }
+  }, [refreshDevices]);
+
+  const snapPhoto = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    setCaptureFlash(true);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const snapFile = new File([blob], `camera_snap_${Date.now()}.jpg`, {
+        type: 'image/jpeg',
+      });
+      stopCamera();
+      onSnap(snapFile);
+    }, 'image/jpeg', 0.9);
+  }, [onSnap, stopCamera]);
+
+  const switchCamera = useCallback(() => {
+    if (videoDevices.length > 1) {
+      const currentIndex = videoDevices.findIndex((d) => d.deviceId === selectedDeviceId);
+      const nextIndex = (currentIndex + 1) % videoDevices.length;
+      const nextDevId = videoDevices[nextIndex].deviceId;
+      setSelectedDeviceId(nextDevId);
+      startCamera(nextDevId);
+    } else {
+      startCamera();
+    }
+  }, [videoDevices, selectedDeviceId, startCamera]);
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="space-y-3"
+    >
+      <div className="relative rounded-2xl overflow-hidden border border-border/50 bg-black aspect-video flex items-center justify-center">
+        {cameraState === 'idle' && (
+          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <div className="flex size-16 items-center justify-center rounded-2xl bg-primary/20 text-primary">
+              <Camera className="size-8" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Live Camera</p>
+              <p className="text-xs text-white/60 mt-0.5">Snap a photo directly with your camera</p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => startCamera(selectedDeviceId || undefined)}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-primary hover:bg-primary/90 text-white shadow-sm transition-all active:scale-95"
+              >
+                <Camera className="size-3.5" />
+                Open Camera
+              </button>
+              <button
+                type="button"
+                onClick={() => nativeCameraInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/15 hover:bg-white/25 text-white border border-white/20 backdrop-blur-sm transition-all active:scale-95"
+                title="Select a photo from your computer or mobile camera"
+              >
+                <Upload className="size-3.5" />
+                Browse Photo
+              </button>
+            </div>
+          </div>
+        )}
+
+        {cameraState === 'opening' && (
+          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <Loader2 className="size-8 text-primary animate-spin" />
+            <p className="text-sm text-white/80">Connecting camera...</p>
+          </div>
+        )}
+
+        {cameraState === 'error' && (
+          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <div className="flex size-12 items-center justify-center rounded-full bg-red-500/20 text-red-400">
+              <AlertTriangle className="size-6" />
+            </div>
+            <p className="text-xs text-red-400 max-w-[280px] leading-relaxed">{cameraError}</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => startCamera(selectedDeviceId || undefined)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary hover:bg-primary/90 text-white shadow-sm transition-all active:scale-95"
+              >
+                <RefreshCw className="size-3.5" />
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => nativeCameraInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/15 hover:bg-white/25 text-white border border-white/20 backdrop-blur-sm transition-all active:scale-95"
+              >
+                <Upload className="size-3.5" />
+                Browse from Computer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Video feed element for viewfinder */}
+        <video
+          ref={videoRef}
+          className={cn('w-full h-full object-cover', cameraState !== 'active' && 'hidden')}
+          playsInline
+          muted
+          autoPlay
+        />
+
+        {/* Shutter flash animation */}
+        <AnimatePresence>
+          {captureFlash && (
+            <motion.div
+              initial={{ opacity: 0.8 }}
+              animate={{ opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-white z-20 pointer-events-none"
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Viewfinder brackets */}
+        {cameraState === 'active' && (
+          <div className="absolute inset-4 pointer-events-none">
+            <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-primary/80 rounded-tl" />
+            <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-primary/80 rounded-tr" />
+            <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-primary/80 rounded-bl" />
+            <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-primary/80 rounded-br" />
+          </div>
+        )}
+
+        <canvas ref={canvasRef} className="hidden" />
+        <input
+          ref={nativeCameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onSnap(f);
+          }}
+        />
+      </div>
+
+      {/* Camera shutter controls */}
+      {cameraState === 'active' && (
+        <div className="flex items-center justify-center gap-3 py-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={switchCamera}
+            className="rounded-full size-10 border-border/60"
+            title="Switch front/back camera"
+          >
+            <SwitchCamera className="size-4" />
+          </Button>
+
+          <Button
+            type="button"
+            onClick={snapPhoto}
+            className="rounded-full px-6 gap-2 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25 h-11"
+          >
+            <Aperture className="size-5" />
+            <span className="font-semibold text-sm">Snap Photo</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={stopCamera}
+            className="rounded-full size-10 border-border/60 text-muted-foreground hover:text-foreground"
+            title="Cancel"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -324,15 +676,17 @@ function DetectionResults({
 
             {/* Grouped item list */}
             <div className="flex flex-col gap-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-              {Object.entries(
-                detection.items.reduce((acc, item) => {
-                  if (!acc[item.class_name]) {
-                    acc[item.class_name] = { count: 0, items: [], group: item.waste_group };
-                  }
-                  acc[item.class_name].count += 1;
-                  acc[item.class_name].items.push(item);
-                  return acc;
-                }, {} as Record<string, { count: number; items: DetectionItem[]; group: string }>)
+              {(
+                Object.entries(
+                  detection.items.reduce<Record<string, { count: number; items: DetectionItem[]; group: string }>>((acc, item) => {
+                    if (!acc[item.class_name]) {
+                      acc[item.class_name] = { count: 0, items: [], group: item.waste_group };
+                    }
+                    acc[item.class_name].count += 1;
+                    acc[item.class_name].items.push(item);
+                    return acc;
+                  }, {})
+                ) as [string, { count: number; items: DetectionItem[]; group: string }][]
               )
               .sort(([, a], [, b]) => b.count - a.count)
               .map(([className, data]) => {
@@ -454,6 +808,7 @@ function DetectionResults({
 type UploadState = 'idle' | 'detecting' | 'done' | 'error';
 
 export default function DetectPage() {
+  const [mode, setMode] = useState<DetectMode>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -602,7 +957,6 @@ export default function DetectPage() {
       setErrorMsg(apiErrorMessage(err, 'Detection failed. Please try again.'));
       setState('error');
     }
-
   };
 
   const resetAll = () => {
@@ -613,6 +967,7 @@ export default function DetectPage() {
     setExifStatus('idle');
     setLatitude('');
     setLongitude('');
+    setState('idle');
   };
 
   const canSubmit = !!file && state !== 'detecting';
@@ -629,7 +984,7 @@ export default function DetectPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Waste Detection</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Upload a geotagged image to detect and classify waste using AI.
+            Upload a geotagged image or stream camera frames to detect and classify waste in real-time.
           </p>
         </div>
 
@@ -660,21 +1015,64 @@ export default function DetectPage() {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="glass rounded-2xl p-6 space-y-5"
         >
-          <div className="flex items-center gap-2">
-            <ImageIcon className="size-4.5 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Image Upload</h2>
+          {/* Mode Switcher Tabs */}
+          <div className="flex items-center justify-between gap-2 pb-1 border-b border-border/40">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-muted/40 border border-border/40">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('upload');
+                  if (state === 'error') setErrorMsg('');
+                }}
+                className={cn(
+                  'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                  mode === 'upload'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                )}
+              >
+                <Upload className="size-3.5" />
+                Upload Image
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('camera');
+                  if (state === 'error') setErrorMsg('');
+                }}
+                className={cn(
+                  'flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                  mode === 'camera'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                )}
+              >
+                <Camera className="size-3.5" />
+                Live Camera
+              </button>
+            </div>
+            {mode === 'camera' && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+                <span className="size-1.5 rounded-full bg-primary" />
+                Camera Mode
+              </span>
+            )}
           </div>
 
-          {/* Upload zone / preview */}
+          {/* Mode Body: Upload zone / preview OR DirectCameraSnapView */}
           {!file ? (
-            <UploadZone
-              onFile={handleFile}
-              isDragging={isDragging}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              fileInputRef={fileInputRef}
-            />
+            mode === 'upload' ? (
+              <UploadZone
+                onFile={handleFile}
+                isDragging={isDragging}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                fileInputRef={fileInputRef}
+              />
+            ) : (
+              <DirectCameraSnapView onSnap={handleFile} />
+            )
           ) : (
             <ImagePreview preview={preview!} file={file} onRemove={handleRemove} />
           )}

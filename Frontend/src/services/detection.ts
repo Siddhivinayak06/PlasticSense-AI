@@ -108,3 +108,27 @@ export function riskFromDetection(det: Detection): RiskAssessment | null {
     computed_at: det.created_at,
   };
 }
+
+// ─── Live Camera Detection ──────────────────────────────────────
+
+export interface LiveDetectionResponse {
+  detection: Detection;
+  frame_id: string;
+}
+
+/**
+ * Send a single webcam frame (base64-encoded) to the live detection endpoint.
+ */
+export async function submitLiveFrame(
+  frameBase64: string,
+  latitude: number | null,
+  longitude: number | null,
+): Promise<LiveDetectionResponse> {
+  const { data } = await api.post<LiveDetectionResponse>('/detections/live/frame', {
+    frame: frameBase64,
+    latitude,
+    longitude,
+    persist: true,
+  });
+  return data;
+}
